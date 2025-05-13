@@ -8,6 +8,8 @@ library(nlme)
 library(car)
 library(lubridate)
 library(ggthemes)
+library(performance)
+library(emmeans)
 rm(list=ls()) # clean up
 
 # Set working directory and write location
@@ -15,7 +17,7 @@ setwd("C:\\Users\\K_WILCOX\\OneDrive - UNCG\\Current projects\\GMDR\\data\\soil_
 figs_to <- "C:\\Users\\k_wilcox\\OneDrive - UNCG\\Current projects\\GMDR\\npp_manuscript\\figures\\"
 
 ### Set graphing parameters
-source("C:\\Users\\K_WILCOX\\OneDrive - UNCG\\Git projects\\Grazing-Management-for-Drought-Resilience\\graph_format.R")
+source("C:\\Users\\K_WILCOX\\OneDrive - UNCG\\Git projects\\Grazing-Management-for-Drought-Resilience\\GMDR-NPP-Manuscript\\99_graph_format.R")
 
 ### Create Standard Error function 
 SE_function<-function(x,na.rm=na.rm){
@@ -26,10 +28,12 @@ SE_function<-function(x,na.rm=na.rm){
 }
 
 ### Read in anova_t3 function
-source("C:\\Users\\K_WILCOX\\OneDrive - UNCG\\Git projects\\Grazing-Management-for-Drought-Resilience\\lme_anova_type3_function.R")
+source("C:\\Users\\K_WILCOX\\OneDrive - UNCG\\Git projects\\Grazing-Management-for-Drought-Resilience\\GMDR-NPP-Manuscript\\99_lme_anova_type3_function.R")
 
-
+###
 ### Read in Data and Key, clean up data frames
+###
+{
 Plot_Key <- read.csv("..\\Plot_Treatment_Key_020424.csv") %>%
   rename(PlotID=plot, Site=site)
 
@@ -164,11 +168,12 @@ smoist_means_all <- smoist_all %>%
             smoist_se = SE_function(Soil.Moisture)) %>%
   ungroup()
 
-
+}
 
 ###
-### Plotting soil moisture
+### Plotting soil moisture and precip (daily)
 ###
+{
 # Theme set -- text size, background, and grid lines
 theme_set(theme_few())
 theme_update(axis.title.x=element_text(size=20, vjust=-0.35), axis.text.x=element_text(size=16),
@@ -198,9 +203,9 @@ soil_moisture_figure <- ggplot(smoist_means_all, aes(x=DOY2, y=smoist_mean,
   geom_errorbar(col="black",width=1) +
   geom_path(col="black", aes(lty=as.factor(Drought))) +
   geom_point(color="black",size=2 ) +
-  scale_fill_manual(values=All_Drought, name='Drought\nTreatment') +
-  scale_colour_manual(values=All_Drought, name='Drought\nTreatment') +
-  scale_shape_manual(values=Drought_Symbol) +
+  scale_fill_manual(values=droughtColor, name='Drought\nTreatment') +
+  scale_colour_manual(values=droughtColor, name='Drought\nTreatment') +
+  scale_shape_manual(values=droughtSymbol) +
   xlab("Day of year") + ylab("Soil Moisture (%)") +
   theme_update(axis.title.x=element_text(size=14, vjust=-0.35), 
                axis.text.x=element_text(size=14),
@@ -212,19 +217,69 @@ pdf(file=paste0(figs_to,"SoilMoisture_BothSitesAllYears_",Sys.Date(),".pdf"), wi
 print(soil_moisture_figure)
 dev.off()
 
+## Add on precip data (plot separately but with same dimensions and will overlay in inkscape)
+tb_ppt_daily <- read.csv("..\\precipitation\\TBPrecip_edited.csv") %>% 
+  dplyr::select(-X, -Notes) %>% 
+  mutate(date=as.Date(date, "%m/%d/%y")) %>%
+  mutate(site="TB") %>%
+  dplyr::select(site, date, year, month, day, doy, ppt_mm)
 
-### NOTE: STILL NEED TO ADD IN PPT
+fk_ppt_daily <- read.csv("..\\precipitation\\FKPrecip_edited.csv") %>% 
+  select (-X, -PRCP_ATTRIBUTES , -Notes) %>%
+  mutate(date=as.Date(date, "%m/%d/%Y")) %>%
+  mutate(site="FK") %>%
+  rename(ppt_mm = PRCP) %>%
+  dplyr::select(site, date, year, month, day, doy, ppt_mm)
 
+ppt_daily_all <- tb_ppt_daily %>%
+  bind_rows(fk_ppt_daily)
+
+daily_ppt_fig <- ggplot(filter(ppt_daily_all,doy %in% 100:300 & year %in% 2018:2023), aes(x=doy, y=ppt_mm)) +
+                    geom_col() +
+                    facet_grid(site~year) +
+                    theme_few() +
+                    ylab("Precipitation (mm)") + xlab("Day of year")
+
+pdf(file=paste0(figs_to,"daily ppt_BothSitesAllYears_",Sys.Date(),".pdf"), width=9.14, height=2, useDingbats = F)
+print(daily_ppt_fig)
+dev.off()
+
+}
+
+###
 ### Run models
-
+###
+{
 smoist_all$Time_period <- as.factor(smoist_all$Time_period)
-## Analyze years and sites seperately
+
+  ## Analyze sites seperately and by year
+
 # Model with TB alone 2019
+
+  tb_2019_smoist_lme <- lme(Soil.Moisture ~ Time_period*Grazing + Time_period*as.factor(Drought) + Grazing*as.factor(Drought)
+                         , data=subset(smoist_all, Site=="TB" & Year==2019)
+                         , random = ~1 |Block/Paddock/Plot
+                         , correlation=corAR1(form = ~1 |Block/Paddock/Plot) #(AR1 AIC 4986.65, CS AIC 4993.83 -- going with AR1)
+  #                       , correlation=corCompSymm(form = ~1 |Block/Paddock/Plot) #(AR1 AIC 4986.65, CS AIC 4993.83 -- going with AR1)
+                         , control=lmeControl(returnObject=TRUE)
+                         , na.action = na.omit)
+  
+  anova.lme(tb_2019_smoist_lme, type="marginal")
+  
+  qqnorm(tb_2019_smoist_lme, abline = c(0,1)) ## qqplot
+  AIC(tb_2019_smoist_lme)
+  plot(tb_2019_smoist_lme)
+  hist(tb_2019_smoist_lme$fitted)
+  hist(subset(smoist_all, Site=="TB" & Year==2019)$Soil.Moisture)
+
+  emmeans(tb_2019_smoist_lme, pairwise ~ Drought, by="Time_period", adjust="sidak")
+  emmeans(abun_grassy_lme, pairwise ~ fxn_group, by=c("topo","year"), adjust="sidak")
+  
 smoist_model_tb_2019 <-   anova_t3(IndVars=c('Time_period','Grazing','Drought'),
                                    DepVar='Soil.Moisture',
                                    RndForm='~1 |Block/Paddock/Plot',
                                    Data=subset(smoist_all, Site=="TB" & Year==2019)
-)  
+)
 
 # Model with TB alone 2020
 smoist_model_tb_2020 <-   anova_t3(IndVars=c('Time_period','Grazing','Drought'),
@@ -472,7 +527,7 @@ write.csv(smoist_model_fk_2020_byperiod_master, file=paste0("model_out\\soil moi
 write.csv(smoist_model_fk_2021_byperiod_master, file=paste0("model_out\\soil moisture model output_by time period_fk 2021_", Sys.Date(), ".csv"), row.names=F)
 
 
-
+}
 
 
 
