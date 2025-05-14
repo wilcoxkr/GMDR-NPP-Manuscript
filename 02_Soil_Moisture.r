@@ -10,11 +10,14 @@ library(lubridate)
 library(ggthemes)
 library(performance)
 library(emmeans)
+library(lmerTest)
+library(ggResidpanel)
 rm(list=ls()) # clean up
 
 # Set working directory and write location
 setwd("C:\\Users\\K_WILCOX\\OneDrive - UNCG\\Current projects\\GMDR\\data\\soil_moisture\\")
 figs_to <- "C:\\Users\\k_wilcox\\OneDrive - UNCG\\Current projects\\GMDR\\npp_manuscript\\figures\\"
+tables_to <- "C:\\Users\\k_wilcox\\OneDrive - UNCG\\Current projects\\GMDR\\npp_manuscript\\tables\\"
 
 ### Set graphing parameters
 source("C:\\Users\\K_WILCOX\\OneDrive - UNCG\\Git projects\\Grazing-Management-for-Drought-Resilience\\GMDR-NPP-Manuscript\\99_graph_format.R")
@@ -252,391 +255,296 @@ dev.off()
 {
 smoist_all$Time_period <- as.factor(smoist_all$Time_period)
 
-  ## Analyze sites seperately and by year
+  ## Analyze sites separately and by year
+  ## Note, to look at differences among drought treatments within a time period, I am running emtrends and using 
+  ## a slope estimate with 95CI not including 0 as a significant time point
 
-# Model with TB alone 2019
-
-  tb_2019_smoist_lme <- lme(Soil.Moisture ~ Time_period*Grazing + Time_period*as.factor(Drought) + Grazing*as.factor(Drought)
+  ### TB 2019
+  ###
+  tb_2019_smoist_lme <- lme(sqrt(Soil.Moisture) ~ Time_period*Grazing + Time_period*Drought + Grazing*Drought
                          , data=subset(smoist_all, Site=="TB" & Year==2019)
                          , random = ~1 |Block/Paddock/Plot
                          , correlation=corAR1(form = ~1 |Block/Paddock/Plot) #(AR1 AIC 4986.65, CS AIC 4993.83 -- going with AR1)
-  #                       , correlation=corCompSymm(form = ~1 |Block/Paddock/Plot) #(AR1 AIC 4986.65, CS AIC 4993.83 -- going with AR1)
                          , control=lmeControl(returnObject=TRUE)
                          , na.action = na.omit)
   
-  anova.lme(tb_2019_smoist_lme, type="marginal")
-  
+  # Model diagnostics
+  plot(tb_2019_smoist_lme, type=c("p","smooth"), col.line=1)
   qqnorm(tb_2019_smoist_lme, abline = c(0,1)) ## qqplot
-  AIC(tb_2019_smoist_lme)
-  plot(tb_2019_smoist_lme)
-  hist(tb_2019_smoist_lme$fitted)
-  hist(subset(smoist_all, Site=="TB" & Year==2019)$Soil.Moisture)
-
-  emmeans(tb_2019_smoist_lme, pairwise ~ Drought, by="Time_period", adjust="sidak")
-  emmeans(abun_grassy_lme, pairwise ~ fxn_group, by=c("topo","year"), adjust="sidak")
+  hist(sqrt(subset(smoist_all, Site=="TB" & Year==2019)$Soil.Moisture))
   
-smoist_model_tb_2019 <-   anova_t3(IndVars=c('Time_period','Grazing','Drought'),
-                                   DepVar='Soil.Moisture',
-                                   RndForm='~1 |Block/Paddock/Plot',
-                                   Data=subset(smoist_all, Site=="TB" & Year==2019)
-)
-
-# Model with TB alone 2020
-smoist_model_tb_2020 <-   anova_t3(IndVars=c('Time_period','Grazing','Drought'),
-                                   DepVar='Soil.Moisture',
-                                   RndForm='~1 |Block/Paddock/Plot',
-                                   Data=subset(smoist_all, Site=="TB" & Year==2020)
-)  
-# Model with TB alone 2021
-smoist_model_tb_2021 <-   anova_t3(IndVars=c('Time_period','Grazing','Drought'),
-                                   DepVar='Soil.Moisture',
-                                   RndForm='~1 |Block/Paddock/Plot',
-                                   Data=subset(smoist_all, Site=="TB" & Year==2021)
-)  
-# Model with TB alone 2022
-smoist_model_tb_2022 <-   anova_t3(IndVars=c('Time_period','Grazing','Drought'),
-                                   DepVar='Soil.Moisture',
-                                   RndForm='~1 |Block/Paddock/Plot',
-                                   Data=subset(smoist_all, Site=="TB" & Year==2022)
-) 
-
-# Model with TB alone 2023
-smoist_model_tb_2023 <-   anova_t3(IndVars=c('Time_period','Grazing','Drought'),
-                                   DepVar='Soil.Moisture',
-                                   RndForm='~1 |Block/Paddock/Plot',
-                                   Data=subset(smoist_all, Site=="TB" & Year==2023)
-)  
-
-# Model with FK alone 2019
-smoist_model_fk_2019 <-   anova_t3(IndVars=c('Time_period','Grazing','Drought'),
-                                   DepVar='Soil.Moisture',
-                                   RndForm='~1 |Block/Paddock/Plot',
-                                   Data=subset(smoist_all, Site=="FK" & Year==2019)
-)  
-
-# Model with FK alone 2020
-smoist_model_fk_2020 <-   anova_t3(IndVars=c('Time_period','Grazing','Drought'),
-                                   DepVar='Soil.Moisture',
-                                   RndForm='~1 |Block/Paddock/Plot',
-                                   Data=subset(smoist_all, Site=="FK" & Year==2020)
-) 
-
-# Model with FK alone 2021
-smoist_model_fk_2021 <-   anova_t3(IndVars=c('Time_period','Grazing','Drought'),
-                                   DepVar='Soil.Moisture',
-                                   RndForm='~1 |Block/Paddock/Plot',
-                                   Data=subset(smoist_all, Site=="FK" & Year==2021)
-) 
-
-# Model with FK alone 2022
-smoist_model_fk_2022 <-   anova_t3(IndVars=c('Time_period','Grazing','Drought'),
-                                   DepVar='Soil.Moisture',
-                                   RndForm='~1 |Block/Paddock/Plot',
-                                   Data=subset(smoist_all, Site=="FK" & Year==2022)
-) 
-
-# Model with FK alone 2023
-smoist_model_fk_2023 <-   anova_t3(IndVars=c('Time_period','Grazing','Drought'),
-                                   DepVar='Soil.Moisture',
-                                   RndForm='~1 |Block/Paddock/Plot',
-                                   Data=subset(smoist_all, Site=="FK" & Year==2023)
-) 
-
-### Comments from site-year models
-# No significant effects of grazing main or interactive effects
-# Significant effects of drought, time period, and drought:time period at all sites in 2019-2020 (update -- there is also a significatnt drought x time period effect in FK 2021)
-# Now to split by time period in these years to see which time periods there are significant differences among drought treatments
-
-### TB 2019 by time period
-time_period_vec_tb19 <- levels(factor(subset(smoist_all, Site=="TB" & Year==2019)$Time_period))
-smoist_model_tb_2019_byperiod_master <- {}
-
-for(TIME in 1:length(time_period_vec_tb19)){
-  data_temp <- smoist_all %>%
-    filter(Site=="TB" & Year==2019 & Time_period==time_period_vec_tb19[TIME])
-  model_temp <- lme(Soil.Moisture ~ Drought
-                    , data=data_temp
-                    , random = ~1 |Block/Paddock/Plot
-                    , na.action = na.omit)
-  model_out_temp <- data.frame(Site="TB", 
-                               Year="2019", 
-                               Time_period=time_period_vec_tb19[TIME],
-                               Model_term=row.names(anova.lme(model_temp, type="marginal")[2,]),
-                               anova.lme(model_temp, type="marginal")[2,])
-  smoist_model_tb_2019_byperiod_master <- rbind(smoist_model_tb_2019_byperiod_master, model_out_temp)
-  rm(data_temp, model_temp, model_out_temp)
-}
-smoist_model_tb_2019_byperiod_master <- smoist_model_tb_2019_byperiod_master %>%
-  mutate(sig_flag = ifelse(p.value<0.05,"*",ifelse(p.value<0.1,".","")))
-
-### TB 2020 by time period
-time_period_vec_tb20 <- levels(factor(subset(smoist_all, Site=="TB" & Year==2020)$Time_period))
-smoist_model_tb_2020_byperiod_master <- {}
-
-for(TIME in 1:length(time_period_vec_tb20)){
-  data_temp <- smoist_all %>%
-    filter(Site=="TB" & Year==2020 & Time_period==time_period_vec_tb20[TIME])
-  model_temp <- lme(Soil.Moisture ~ Drought
-                    , data=data_temp
-                    , random = ~1 |Block/Paddock/Plot
-                    , na.action = na.omit)
-  model_out_temp <- data.frame(Site="TB", 
-                               Year="2020", 
-                               Time_period=time_period_vec_tb20[TIME],
-                               Model_term=row.names(anova.lme(model_temp, type="marginal")[2,]),
-                               anova.lme(model_temp, type="marginal")[2,])
-  smoist_model_tb_2020_byperiod_master <- rbind(smoist_model_tb_2020_byperiod_master, model_out_temp)
-  rm(data_temp, model_temp, model_out_temp)
-}
-smoist_model_tb_2020_byperiod_master <- smoist_model_tb_2020_byperiod_master %>%
-  mutate(sig_flag = ifelse(p.value<0.05,"*",ifelse(p.value<0.1,".","")))
-
-### FK 2019 by time period
-time_period_vec_fk19 <- levels(factor(subset(smoist_all, Site=="FK" & Year==2019)$Time_period))
-smoist_model_fk_2019_byperiod_master <- {}
-
-for(TIME in 1:length(time_period_vec_fk19)){
-  data_temp <- smoist_all %>%
-    filter(Site=="FK" & Year==2019 & Time_period==time_period_vec_fk19[TIME])
-  model_temp <- lme(Soil.Moisture ~ Drought
-                    , data=data_temp
-                    , random = ~1 |Block/Paddock/Plot
-                    , na.action = na.omit)
-  model_out_temp <- data.frame(Site="FK", 
-                               Year="2019", 
-                               Time_period=time_period_vec_fk19[TIME],
-                               Model_term=row.names(anova.lme(model_temp, type="marginal")[2,]),
-                               anova.lme(model_temp, type="marginal")[2,])
-  smoist_model_fk_2019_byperiod_master <- rbind(smoist_model_fk_2019_byperiod_master, model_out_temp)
-  rm(data_temp, model_temp, model_out_temp)
-}
-smoist_model_fk_2019_byperiod_master <- smoist_model_fk_2019_byperiod_master %>%
-  mutate(sig_flag = ifelse(p.value<0.05,"*",ifelse(p.value<0.1,".","")))
-
-
-### FK 2020 by time period
-time_period_vec_fk20 <- levels(factor(subset(smoist_all, Site=="FK" & Year==2020)$Time_period))
-smoist_model_fk_2020_byperiod_master <- {}
-
-for(TIME in 1:length(time_period_vec_fk20)){
-  data_temp <- smoist_all %>%
-    filter(Site=="FK" & Year==2020 & Time_period==time_period_vec_fk20[TIME])
-  model_temp <- lme(Soil.Moisture ~ Drought
-                    , data=data_temp
-                    , random = ~1 |Block/Paddock/Plot
-                    , na.action = na.omit)
-  model_out_temp <- data.frame(Site="FK", 
-                               Year="2020", 
-                               Time_period=time_period_vec_fk20[TIME],
-                               Model_term=row.names(anova.lme(model_temp, type="marginal")[2,]),
-                               anova.lme(model_temp, type="marginal")[2,])
-  smoist_model_fk_2020_byperiod_master <- rbind(smoist_model_fk_2020_byperiod_master, model_out_temp)
-  rm(data_temp, model_temp, model_out_temp)
-}
-smoist_model_fk_2020_byperiod_master <- smoist_model_fk_2020_byperiod_master %>%
-  mutate(sig_flag = ifelse(p.value<0.05,"*",ifelse(p.value<0.1,".","")))
-
-### FK 2021 by time period
-time_period_vec_fk21 <- levels(factor(subset(smoist_all, Site=="FK" & Year==2021)$Time_period))
-smoist_model_fk_2021_byperiod_master <- {}
-
-for(TIME in 1:length(time_period_vec_fk21)){
-  data_temp <- smoist_all %>%
-    filter(Site=="FK" & Year==2021 & Time_period==time_period_vec_fk21[TIME])
-  model_temp <- lme(Soil.Moisture ~ Drought
-                    , data=data_temp
-                    , random = ~1 |Block/Paddock/Plot
-                    , na.action = na.omit)
-  model_out_temp <- data.frame(Site="FK", 
-                               Year="2021", 
-                               Time_period=time_period_vec_fk21[TIME],
-                               Model_term=row.names(anova.lme(model_temp, type="marginal")[2,]),
-                               anova.lme(model_temp, type="marginal")[2,])
-  smoist_model_fk_2021_byperiod_master <- rbind(smoist_model_fk_2021_byperiod_master, model_out_temp)
-  rm(data_temp, model_temp, model_out_temp)
-}
-smoist_model_fk_2021_byperiod_master <- smoist_model_fk_2021_byperiod_master %>%
-    mutate(sig_flag = ifelse(p.value<0.05,"*",ifelse(p.value<0.1,".","")))
-
-### Combine model results from annual runs 
-yearly_model_out <- smoist_model_tb_2019 %>%
-  mutate(Site="TB",
-         Year=2019,
-         model_effect = row.names(smoist_model_tb_2019)) %>%
-  bind_rows(smoist_model_tb_2020 %>%
-              mutate(Site="TB",
-                     Year=2020,
-                     model_effect = row.names(smoist_model_tb_2020))
-  ) %>%
-  bind_rows(smoist_model_tb_2021 %>%
-              mutate(Site="TB",
-                     Year=2021,
-                     model_effect = row.names(smoist_model_tb_2021))
-  ) %>%
-  bind_rows(smoist_model_tb_2022 %>%
-              mutate(Site="TB",
-                     Year=2022,
-                     model_effect = row.names(smoist_model_tb_2022))
-  ) %>%
-  bind_rows(smoist_model_tb_2023 %>%
-              mutate(Site="TB",
-                     Year=2023,
-                     model_effect = row.names(smoist_model_tb_2023))
-  ) %>%
-  bind_rows(smoist_model_fk_2019 %>%
-              mutate(Site="FK",
-                     Year=2019,
-                     model_effect = row.names(smoist_model_fk_2019))
-  ) %>%
-  bind_rows(smoist_model_fk_2020 %>%
-              mutate(Site="FK",
-                     Year=2020,
-                     model_effect = row.names(smoist_model_fk_2020))
-  ) %>%
-  bind_rows(smoist_model_fk_2021 %>%
-              mutate(Site="FK",
-                     Year=2021,
-                     model_effect = row.names(smoist_model_fk_2021))
-  ) %>%
-  bind_rows(smoist_model_fk_2022 %>%
-              mutate(Site="FK",
-                     Year=2022,
-                     model_effect = row.names(smoist_model_fk_2022))
-  ) %>%
-  bind_rows(smoist_model_fk_2023 %>%
-              mutate(Site="FK",
-                     Year=2023,
-                     model_effect = row.names(smoist_model_fk_2023))
-  ) %>%
-  rename(p_value="p-value", F_value="F-value") %>%
-  dplyr::select(Site, Year, model_effect, numDF, denDF, F_value, p_value) %>%
-  mutate(sig_flag = ifelse(p_value<0.05,"*",ifelse(p_value<0.1,".","")))
-
-
-### Write files to csv format
-write.csv(smoist_all, file="soil moisture fk and tb 2019-2023_2024_07_11.csv", row.names=F)
-
-#by site and year models
-write.csv(yearly_model_out, file=paste0("model_out\\soil moisture annual model output_both sites all years_",Sys.Date(),".csv"), row.names=F)
-
-# by time period models
-write.csv(smoist_model_tb_2019_byperiod_master, file=paste0("model_out\\soil moisture model output_by time period_tb 2019_", Sys.Date(), ".csv"), row.names=F)
-write.csv(smoist_model_tb_2020_byperiod_master, file=paste0("model_out\\soil moisture model output_by time period_tb 2020_", Sys.Date(), ".csv"), row.names=F)
-write.csv(smoist_model_fk_2019_byperiod_master, file=paste0("model_out\\soil moisture model output_by time period_fk 2019_", Sys.Date(), ".csv"), row.names=F)
-write.csv(smoist_model_fk_2020_byperiod_master, file=paste0("model_out\\soil moisture model output_by time period_fk 2020_", Sys.Date(), ".csv"), row.names=F)
-write.csv(smoist_model_fk_2021_byperiod_master, file=paste0("model_out\\soil moisture model output_by time period_fk 2021_", Sys.Date(), ".csv"), row.names=F)
-
-
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-smoist_data_2020 <- read.csv("2020_Soil Moisture.csv") %>% 
-  dplyr::select(-Notes, -X, -X.1, -X.2, -Block, -Paddock, -Drought, -Grazing) %>%
-  full_join(Plot_Key, by=c("Site", "Plot")) %>%
-  mutate(Date = as.Date(paste(Month, Day, Year, sep="-"), "%m-%d-%Y")) %>%
-  dplyr::select(Site, Year, Month, Day, Date, Time_Period, 
-                Site, Block, Paddock, Plot, Drought, Grazing, Soil_Moisture)
-
-smoist_data_2019_fk <- read.csv("2019 Compiled Moisture Data_FortKeogh.csv") %>%
-#  mutate(Date=as.Date(Date), format= "%m/%d/%Y")
-  separate(Date, c("Month", "Day", "Year"), sep="/") %>%
-  mutate(Date = as.Date(paste(Month, Day, Year, sep="-"), "%m-%d-%Y")) %>%
-  mutate(Year=as.numeric(Year),
-         Month=as.numeric(Month),
-         Day=as.numeric(Day)) %>%
-  dplyr::select(-Drought) %>%
-  left_join(Plot_Key, by=c("Site", "Block", "Plot")) %>%
-  rename(Time_Period=Time_period, Soil_Moisture=Soil_moisture) %>%
-  dplyr::select(Site, Year, Month, Day, Date, Time_Period, 
-                Site, Block, Paddock, Plot, Drought, Grazing, Soil_Moisture)
-
-smoist_data_2019_tb <- read.csv("Soil Moisture data 11jan2021_fromLP.csv") %>%
-  filter(Year==2019) %>%
-  dplyr::select(-Year) %>%
-  separate(Date, c("Month", "Day", "Year"), sep="/") %>%
-  mutate(Date = as.Date(paste(Month, Day, Year, sep="-"), "%m-%d-%Y")) %>%
-  mutate(Year=as.numeric(Year),
-         Month=as.numeric(Month),
-         Day=as.numeric(Day)) %>%
-  dplyr::select(-Drought, -Grazing) %>%
-  left_join(Plot_Key, by=c("Site", "Block", "Paddock", "Plot")) %>%
-  rename(Time_Period=Sampling.Period, Soil_Moisture=Soil.Moisture) %>%
-  dplyr::select(Site, Year, Month, Day, Date, Time_Period, 
-                Site, Block, Paddock, Plot, Drought, Grazing, Soil_Moisture)
-
-### Combine into one data frame
-# The drought treatment identifiers are incorrect in the TB 2020 timepoints 11-14; Getting rid of all drought identiers and replace with plot-treatment key
-smoist_data_all <- smoist_data_2019_fk %>%
-  bind_rows(smoist_data_2019_tb, smoist_data_2020) %>%
-  dplyr::select(-Drought, -Grazing) %>%
-  full_join(Plot_Key, by=c("Site", "Block", "Paddock", "Plot")) %>%
-  mutate(site_plot=paste(Site, Plot, sep="_"))
-
-#Tell R what are the factors
-smoist_data_all$Grazing <- factor(smoist_data_all$Grazing, levels=c("MLLMM","MMMMM","HHMMM"))
-smoist_data_all$Block <- as.factor(smoist_data_all$Block)
-smoist_data_all$Paddock <- as.factor(smoist_data_all$Paddock)
-smoist_data_all$Plot <- as.factor(smoist_data_all$Plot)
-smoist_data_all$Time_Period <- as.factor(smoist_data_all$Time_Period)
-
-### Plot data
-## Raw data by site
-ggplot(smoist_data_all, aes(x=Date, y=Soil_Moisture, col=as.factor(Drought), 
-                                                          fill=as.factor(Drought), shape=as.factor(Drought))) +
-  geom_point(alpha=0.7, color="black") +
-  geom_smooth(se=F) +
-  scale_fill_manual(values=droughtColor, name='Drought\nTreatment') +
-  scale_colour_manual(values=droughtColor, name='Drought\nTreatment') +
-  scale_shape_manual(values=droughtSymbol) +
-  facet_grid(Site~Year, scales="free_x")
+  # Save ANCOVA results
+  anova_temp <- anova.lme(tb_2019_smoist_lme, type="marginal")
+  anova_tb_smoist_2019 <- data.frame(effect=row.names(anova_temp), anova_temp,site="TB",year=2019)
+  rm(anova_temp)
   
-## Means and se's
-# Create a Date-Time period key with just one date per time period for plotting purposes
-date_period_key <- unique(dplyr::select(smoist_data_all, Site, Year, Date, Time_Period)) %>%
-  filter(!(Site=="TB"&Year==2020&Date=="2020-06-18" )) # one time period got sampled on two dates, here I remove one of them for data alignment purposes
+  # Save emtrends
+  emtrends_2019_tb <- as.data.frame(emtrends(tb_2019_smoist_lme, "Time_period", var="Drought")) %>%
+    mutate(site="TB", year=2019)
+  # Plot to see significant drought slopes by time period
+  ggplot(as.data.frame(emtrends_2019_tb), aes(Time_period, Drought.trend, ymin=lower.CL, ymax=upper.CL)) + geom_errorbar() + geom_point() + geom_hline(yintercept=0)
 
-smoist_drought_means <- smoist_data_all %>%
-  group_by(Site, Year, Time_Period, Drought) %>% 
-  summarize_at(vars(Soil_Moisture),.funs = c(mean,SE_function),na.rm=TRUE) %>% 
-  rename(smoist_mean=fn1,smoist_se=fn2) %>%
-  full_join(date_period_key, by=c("Site", "Year", "Time_Period"))
+  ### TB 2020 ##
+  ###
+   tb_2020_smoist_lme <- lme(sqrt(Soil.Moisture) ~ Time_period*Grazing + Time_period*Drought + Grazing*Drought
+                            , data=subset(smoist_all, Site=="TB" & Year==2020)
+                            , random = ~1 |Block/Paddock/Plot
+                            , correlation=corAR1(form = ~1 |Block/Paddock/Plot) #(AR1 AIC 4986.65, CS AIC 4993.83 -- going with AR1)
+                            , control=lmeControl(returnObject=TRUE)
+                            , na.action = na.omit)
+  
+  # Model diagnostics
+  plot(tb_2020_smoist_lme, type=c("p","smooth"), col.line=1)
+  qqnorm(tb_2020_smoist_lme, abline = c(0,1)) ## qqplot
+  hist(sqrt(subset(smoist_all, Site=="TB" & Year==2020)$Soil.Moisture))
+  
+  # Save ANCOVA results
+  anova_temp <- anova.lme(tb_2020_smoist_lme, type="marginal")
+  anova_tb_smoist_2020 <- data.frame(effect=row.names(anova_temp),anova_temp, site="TB",year=2020)
+  rm(anova_temp)
+  
+  # Save emtrends
+  emtrends_2020_tb <- as.data.frame(emtrends(tb_2020_smoist_lme, "Time_period", var="Drought")) %>%
+    mutate(site="TB",
+           year=2020)
+  # Plot to see significant drought slopes by time period
+  ggplot(as.data.frame(emtrends_2020_tb), aes(Time_period, Drought.trend, ymin=lower.CL, ymax=upper.CL)) + geom_errorbar() + geom_point() + geom_hline(yintercept=0)
+  
+  
+  ### TB 2021 ##
+  ###
+  tb_2021_smoist_lme <- lme(sqrt(Soil.Moisture) ~ Time_period*Grazing + Time_period*Drought + Grazing*Drought
+                            , data=subset(smoist_all, Site=="TB" & Year==2021)
+                            , random = ~1 |Block/Paddock/Plot
+                            , correlation=corAR1(form = ~1 |Block/Paddock/Plot) #(AR1 AIC 4986.65, CS AIC 4993.83 -- going with AR1)
+                            , control=lmeControl(returnObject=TRUE)
+                            , na.action = na.omit)
+  
+  # Model diagnostics
+  plot(tb_2021_smoist_lme, type=c("p","smooth"), col.line=1)
+  qqnorm(tb_2021_smoist_lme, abline = c(0,1)) ## qqplot
+  hist(sqrt(subset(smoist_all, Site=="TB" & Year==2021)$Soil.Moisture))
+  
+  # Save ANCOVA results
+  anova_temp <- anova.lme(tb_2021_smoist_lme, type="marginal")
+  anova_tb_smoist_2021 <- data.frame(effect=row.names(anova_temp), anova_temp, site="TB",year=2021)
+  rm(anova_temp)
+  
+  # Save emtrends
+  emtrends_2021_tb <- as.data.frame(emtrends(tb_2021_smoist_lme, "Time_period", var="Drought")) %>%
+    mutate(site="TB",
+           year=2021)
+  # Plot to see significant drought slopes by time period
+  ggplot(as.data.frame(emtrends_2021_tb), aes(Time_period, Drought.trend, ymin=lower.CL, ymax=upper.CL)) + geom_errorbar() + geom_point() + geom_hline(yintercept=0)
+  
+  ### TB 2022 ##
+  ###
+  tb_2022_smoist_lme <- lme(sqrt(Soil.Moisture) ~ Time_period*Grazing + Time_period*Drought + Grazing*Drought
+                            , data=subset(smoist_all, Site=="TB" & Year==2022)
+                            , random = ~1 |Block/Paddock/Plot
+                            , correlation=corAR1(form = ~1 |Block/Paddock/Plot) #(AR1 AIC 4986.65, CS AIC 4993.83 -- going with AR1)
+                            , control=lmeControl(returnObject=TRUE)
+                            , na.action = na.omit)
+  
+  # Model diagnostics
+  plot(tb_2022_smoist_lme, type=c("p","smooth"), col.line=1)
+  qqnorm(tb_2022_smoist_lme, abline = c(0,1)) ## qqplot
+  hist(sqrt(subset(smoist_all, Site=="TB" & Year==2022)$Soil.Moisture))
+  
+  # Save ANCOVA results
+  anova_temp <- anova.lme(tb_2022_smoist_lme, type="marginal")
+  anova_tb_smoist_2022 <- data.frame(effect=row.names(anova_temp), anova_temp, site="TB",year=2022)
+  rm(anova_temp)
+  
+  # Save emtrends
+  emtrends_2022_tb <- as.data.frame(emtrends(tb_2022_smoist_lme, "Time_period", var="Drought")) %>%
+    mutate(site="TB",
+           year=2022)
+  # Plot to see significant drought slopes by time period
+  ggplot(as.data.frame(emtrends_2022_tb), aes(Time_period, Drought.trend, ymin=lower.CL, ymax=upper.CL)) + geom_errorbar() + geom_point() + geom_hline(yintercept=0)
+  
+  ### TB 2023 ##
+  ###
+  tb_2023_smoist_lme <- lme(sqrt(Soil.Moisture) ~ Time_period*Grazing + Time_period*Drought + Grazing*Drought
+                            , data=subset(smoist_all, Site=="TB" & Year==2023)
+                            , random = ~1 |Block/Paddock/Plot
+                            , correlation=corAR1(form = ~1 |Block/Paddock/Plot) #(AR1 AIC 4986.65, CS AIC 4993.83 -- going with AR1)
+                            , control=lmeControl(returnObject=TRUE)
+                            , na.action = na.omit)
+  
+  # Model diagnostics
+  plot(tb_2023_smoist_lme, type=c("p","smooth"), col.line=1)
+  qqnorm(tb_2023_smoist_lme, abline = c(0,1)) ## qqplot
+  hist(sqrt(subset(smoist_all, Site=="TB" & Year==2023)$Soil.Moisture))
+  
+  # Save ANCOVA results
+  anova_temp <- anova.lme(tb_2023_smoist_lme, type="marginal")
+  anova_tb_smoist_2023 <- data.frame(effect=row.names(anova_temp),anova_temp, site="TB",year=2023)
+  rm(anova_temp)
+  
+  # Save emtrends
+  emtrends_2023_tb <- as.data.frame(emtrends(tb_2023_smoist_lme, "Time_period", var="Drought")) %>%
+    mutate(site="TB", year=2023)
+  
+  # Plot to see significant drought slopes by time period
+  ggplot(as.data.frame(emtrends_2023_tb), aes(Time_period, Drought.trend, ymin=lower.CL, ymax=upper.CL)) + geom_errorbar() + geom_point() + geom_hline(yintercept=0)
+  
+    
+  ### FK 2019
+  ###
+  fk_2019_smoist_lme <- lme(sqrt(Soil.Moisture) ~ Time_period*Grazing + Time_period*Drought + Grazing*Drought
+                            , data=subset(smoist_all, Site=="FK" & Year==2019)
+                            , random = ~1 |Block/Paddock/Plot
+                            , correlation=corAR1(form = ~1 |Block/Paddock/Plot) #(AR1 AIC 4986.65, CS AIC 4993.83 -- going with AR1)
+                            , control=lmeControl(returnObject=TRUE)
+                            , na.action = na.omit)
+  
+  # Model diagnostics
+  plot(fk_2019_smoist_lme, type=c("p","smooth"), col.line=1)
+  qqnorm(fk_2019_smoist_lme, abline = c(0,1)) ## qqplot
+  hist(sqrt(subset(smoist_all, Site=="FK" & Year==2019)$Soil.Moisture))
+  
+  # Save ANCOVA results
+  anova_temp <- anova.lme(fk_2019_smoist_lme, type="marginal")
+  anova_fk_smoist_2019 <- data.frame(effect=row.names(anova_temp), anova_temp,site="FK",year=2019)
+  rm(anova_temp)
+  
+  # Save emtrends
+  emtrends_2019_fk <- as.data.frame(emtrends(fk_2019_smoist_lme, "Time_period", var="Drought")) %>%
+    mutate(site="FK", year=2019)
+  # Plot to see significant drought slopes by time period
+  ggplot(as.data.frame(emtrends_2019_fk), aes(Time_period, Drought.trend, ymin=lower.CL, ymax=upper.CL)) + geom_errorbar() + geom_point() + geom_hline(yintercept=0)
+  
+  ### FK 2020 ##
+  ###
+  fk_2020_smoist_lme <- lme(sqrt(Soil.Moisture) ~ Time_period*Grazing + Time_period*Drought + Grazing*Drought
+                            , data=subset(smoist_all, Site=="FK" & Year==2020)
+                            , random = ~1 |Block/Paddock/Plot
+                            , correlation=corAR1(form = ~1 |Block/Paddock/Plot) #(AR1 AIC 4986.65, CS AIC 4993.83 -- going with AR1)
+                            , control=lmeControl(returnObject=TRUE)
+                            , na.action = na.omit)
+  
+  # Model diagnostics
+  plot(fk_2020_smoist_lme, type=c("p","smooth"), col.line=1)
+  qqnorm(fk_2020_smoist_lme, abline = c(0,1)) ## qqplot
+  hist(sqrt(subset(smoist_all, Site=="FK" & Year==2020)$Soil.Moisture))
+  
+  # Save ANCOVA results
+  anova_temp <- anova.lme(fk_2020_smoist_lme, type="marginal")
+  anova_fk_smoist_2020 <- data.frame(effect=row.names(anova_temp),anova_temp, site="FK",year=2020)
+  rm(anova_temp)
+  
+  # Save emtrends
+  emtrends_2020_fk <- as.data.frame(emtrends(fk_2020_smoist_lme, "Time_period", var="Drought")) %>%
+    mutate(site="FK",
+           year=2020)
+  # Plot to see significant drought slopes by time period
+  ggplot(as.data.frame(emtrends_2020_fk), aes(Time_period, Drought.trend, ymin=lower.CL, ymax=upper.CL)) + geom_errorbar() + geom_point() + geom_hline(yintercept=0)
+  
+  
+  ### FK 2021 ##
+  ###
+  fk_2021_smoist_lme <- lme(sqrt(Soil.Moisture) ~ Time_period*Grazing + Time_period*Drought + Grazing*Drought
+                            , data=subset(smoist_all, Site=="FK" & Year==2021)
+                            , random = ~1 |Block/Paddock/Plot
+                            , correlation=corAR1(form = ~1 |Block/Paddock/Plot) #(AR1 AIC 4986.65, CS AIC 4993.83 -- going with AR1)
+                            , control=lmeControl(returnObject=TRUE)
+                            , na.action = na.omit)
+  
+  # Model diagnostics
+  plot(fk_2021_smoist_lme, type=c("p","smooth"), col.line=1)
+  qqnorm(fk_2021_smoist_lme, abline = c(0,1)) ## qqplot
+  hist(sqrt(subset(smoist_all, Site=="FK" & Year==2021)$Soil.Moisture))
+  
+  # Save ANCOVA results
+  anova_temp <- anova.lme(fk_2021_smoist_lme, type="marginal")
+  anova_fk_smoist_2021 <- data.frame(effect=row.names(anova_temp), anova_temp, site="FK",year=2021)
+  rm(anova_temp)
+  
+  # Save emtrends
+  emtrends_2021_fk <- as.data.frame(emtrends(fk_2021_smoist_lme, "Time_period", var="Drought")) %>%
+    mutate(site="FK",
+           year=2021)
+  # Plot to see significant drought slopes by time period
+  ggplot(as.data.frame(emtrends_2021_fk), aes(Time_period, Drought.trend, ymin=lower.CL, ymax=upper.CL)) + geom_errorbar() + geom_point() + geom_hline(yintercept=0)
+  
+  ### FK 2022 ##
+  ###
+  fk_2022_smoist_lme <- lme(sqrt(Soil.Moisture) ~ Time_period*Grazing + Time_period*Drought + Grazing*Drought
+                            , data=subset(smoist_all, Site=="FK" & Year==2022)
+                            , random = ~1 |Block/Paddock/Plot
+                            , correlation=corAR1(form = ~1 |Block/Paddock/Plot) #(AR1 AIC 4986.65, CS AIC 4993.83 -- going with AR1)
+                            , control=lmeControl(returnObject=TRUE)
+                            , na.action = na.omit)
+  
+  # Model diagnostics
+  plot(fk_2022_smoist_lme, type=c("p","smooth"), col.line=1)
+  qqnorm(fk_2022_smoist_lme, abline = c(0,1)) ## qqplot
+  hist(sqrt(subset(smoist_all, Site=="FK" & Year==2022)$Soil.Moisture))
+  
+  # Save ANCOVA results
+  anova_temp <- anova.lme(fk_2022_smoist_lme, type="marginal")
+  anova_fk_smoist_2022 <- data.frame(effect=row.names(anova_temp), anova_temp, site="FK",year=2022)
+  rm(anova_temp)
+  
+  # Save emtrends
+  emtrends_2022_fk <- as.data.frame(emtrends(fk_2022_smoist_lme, "Time_period", var="Drought")) %>%
+    mutate(site="FK",
+           year=2022)
+  # Plot to see significant drought slopes by time period
+  ggplot(as.data.frame(emtrends_2022_fk), aes(Time_period, Drought.trend, ymin=lower.CL, ymax=upper.CL)) + geom_errorbar() + geom_point() + geom_hline(yintercept=0)
+  
+  ### FK 2023 ##
+  ###
+  fk_2023_smoist_lme <- lme(sqrt(Soil.Moisture) ~ Time_period*Grazing + Time_period*Drought + Grazing*Drought
+                            , data=subset(smoist_all, Site=="FK" & Year==2023)
+                            , random = ~1 |Block/Paddock/Plot
+                            , correlation=corAR1(form = ~1 |Block/Paddock/Plot) #(AR1 AIC 4986.65, CS AIC 4993.83 -- going with AR1)
+                            , control=lmeControl(returnObject=TRUE)
+                            , na.action = na.omit)
+  
+  # Model diagnostics
+  plot(fk_2023_smoist_lme, type=c("p","smooth"), col.line=1)
+  qqnorm(fk_2023_smoist_lme, abline = c(0,1)) ## qqplot
+  hist(sqrt(subset(smoist_all, Site=="FK" & Year==2023)$Soil.Moisture))
+  
+  # Save ANCOVA results
+  anova_temp <- anova.lme(fk_2023_smoist_lme, type="marginal")
+  anova_fk_smoist_2023 <- data.frame(effect=row.names(anova_temp),anova_temp, site="FK",year=2023)
+  rm(anova_temp)
+  
+  # Save emtrends
+  emtrends_2023_fk <- as.data.frame(emtrends(fk_2023_smoist_lme, "Time_period", var="Drought")) %>%
+    mutate(site="FK", year=2023)
+  
+  # Plot to see significant drought slopes by time period
+  ggplot(as.data.frame(emtrends_2023_fk), aes(Time_period, Drought.trend, ymin=lower.CL, ymax=upper.CL)) + geom_errorbar() + geom_point() + geom_hline(yintercept=0)
+  
 
-smoist_means_plot <- ggplot(smoist_drought_means, aes(x=Date, y=smoist_mean, ymin=smoist_mean-smoist_se, ymax=smoist_mean+smoist_se,
-                                 col=as.factor(Drought), fill=as.factor(Drought), shape=as.factor(Drought))) +
-  geom_errorbar(col="black",width=0.1) +
-  geom_path(col="black", aes(lty=as.factor(Drought))) +
-  geom_point(color="black",size=2 ) +
-  scale_fill_manual(values=droughtColor, name='Drought\nTreatment') +
-  scale_colour_manual(values=droughtColor, name='Drought\nTreatment') +
-  scale_shape_manual(values=droughtSymbol) +
-  facet_grid(Site~Year, scales="free_x") +
-  xlab("Date") + ylab("Soil Moisture (%)")
+  anova_smoist_all <- anova_fk_smoist_2019 %>%
+    bind_rows(anova_fk_smoist_2020, 
+              anova_fk_smoist_2021,
+              anova_fk_smoist_2022,
+              anova_fk_smoist_2023,
+              anova_tb_smoist_2020, 
+              anova_tb_smoist_2021,
+              anova_tb_smoist_2022,
+              anova_tb_smoist_2023
+              )
+  emtrends_smoist_all <- emtrends_2019_fk %>%
+    bind_rows(emtrends_2020_fk,
+              emtrends_2021_fk,
+              emtrends_2022_fk,
+              emtrends_2023_fk,
+              emtrends_2019_tb,
+              emtrends_2020_tb,
+              emtrends_2021_tb,
+              emtrends_2022_tb,
+              emtrends_2023_tb
+              )
+    
+write.table(emtrends_smoist_all, file=paste0(tables_to, "soil moisture emtrends table both sites all years.csv"), sep=",", row.names=F)
+write.table(anova_smoist_all, file=paste0(tables_to, "soil moisture ANCOVA table both sites all years.csv"), sep=",", row.names=F)
 
-pdf("..//..//figures//soil_moisture_means_FK_TB_2019-2020.pdf", width=12, height=6, useDingbats = F)
-print(smoist_means_plot)
-dev.off()
 
-
-
-
-data_temp <- smoist_all %>%
-  filter(Site=="TB" & Year==2019 & Time_period==time_period_vec_tb19[TIME])
-model_temp <- lme(Soil.Moisture ~ Drought
-                  , data=data_temp
-                  , random = ~1 |Block/Paddock/Plot
-                  , na.action = na.omit)
-summary(model_temp)
+}
