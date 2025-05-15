@@ -1,6 +1,6 @@
-#created: 11/30/2020 last updated: 06/24/2024
+#created: 11/30/2020 last updated: 05/14/2025
 #Title: GMDR Site Soil Moisture Analysis
-#Authors: Kevin and Ashley
+#Authors: Kevin Wilcox (k_wilcox@uncg.edu)
 
 ### Set up workspace
 library(tidyverse)
