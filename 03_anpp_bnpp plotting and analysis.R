@@ -12,6 +12,7 @@ library(performance)
 library(ggthemes)
 library(broom)
 library(sjstats)
+library(emmeans)
 rm(list=ls()) # clean up
 
 # Set working directory 
@@ -61,6 +62,9 @@ Plot_Key <- read.csv("..\\Plot_Treatment_Key_020424.csv") %>%
   ###
   ### Thunder Basin
   ###
+  
+  #BEGIN_ANPP_SOURCE
+  
 anpp_tb_22 <- read.csv("GMDR_anpp_2018-2022_TB.csv") %>% ## Fixing block, paddock, drought and grazing labels in 2022 data
     filter(Year==2022) %>%
     rename(Clip_strip=Clip.strip, C3P_gm2=C3P.g.m2.,C4P_gm2=C4P.g.m2., Forb_gm2=Forb.g.m2.,
@@ -180,6 +184,8 @@ with(anpp_tb_plot_means, hist(ANPP_gm2))
     summarize_at(vars(c(C4P_gm2:litter, ANPP_gm2)),.funs = c(mean),na.rm=TRUE) %>%
     rename(Plot=PlotID) %>%
     ungroup()
+  
+  #END_ANPP_SOURCE
   
   ### Check for missing data and that data values are reasonable -- LOOKS GOOD
   with(anpp_fk_plot_means, table(Year, Drought, Grazing))
@@ -302,8 +308,6 @@ bnpp_fk_plot_means <- bnpp_fk_19_22 %>%
 hist(bnpp_fk_19_22$bnpp_gm2)
 
 ggplot(bnpp_fk_19_22, aes(x=Drought, y=bnpp_gm2)) + geom_jitter(width=.1) + geom_smooth(method="lm",se=F) + facet_wrap(~Year)
-# ggplot(bnpp_fk_19_22_raw, aes(x=Year, y=AFDM)) + geom_jitter(width=.1) + facet_wrap(~root_cat, scales="free_y")
-# filter(bnpp_fk_19_22_raw, root_cat=="Fine SOM" & AFDM==0)
 }
 
 ###
@@ -362,7 +366,7 @@ write.csv(npp_master, file=paste0(write_dir,"data_sets\\ANPP BNPP total NPP_plot
 }
 
 ###
-### Run models and testing for normality
+### Run models and testing for normality - Response ratios
 ###
 {
   
@@ -398,7 +402,7 @@ write.csv(npp_master, file=paste0(write_dir,"data_sets\\ANPP BNPP total NPP_plot
                           , random = ~1 |Block/Paddock/Plot
                           , na.action = na.omit)
   anova.lme(fk_anpp_2019_lme, type="marginal")
-  performance::r2(fk_anpp_2019_lme) # THIS DOESN'T SEEM RIGHT - Marginal R2 considers only the variance of the fixed effects, which is what I want
+  performance::r2(fk_anpp_2019_lme) # Marginal R2 considers only the variance of the fixed effects, which is what I want
     # 2020
   fk_anpp_2020_lme <- lme(lnrr_npp ~ Drought
                           , data=filter(npp_rr, Year==2020 & Site=="FK" & npp_type=="ANPP")
@@ -439,6 +443,7 @@ write.csv(npp_master, file=paste0(write_dir,"data_sets\\ANPP BNPP total NPP_plot
   hist(filter(npp_rr, Year %in% 2019:2023 & Site=="TB" & npp_type=="ANPP")$lnrr_npp)
   
   emtrends(tb_anpp_model_full, "Year", var="Drought")
+  test(emtrends(tb_anpp_model_full, "Year", var="Drought"))
   
   # Save to writable tables
   tb_anpp_anova_df <- data.frame(effect=row.names(tb_anpp_anova), tb_anpp_anova, site="TB")
@@ -467,973 +472,300 @@ write.csv(npp_master, file=paste0(write_dir,"data_sets\\ANPP BNPP total NPP_plot
   anova_anpp_df <- tb_anpp_anova_df %>% bind_rows(fk_anpp_anova_df)
   emtrends_anpp_df <- tb_anpp_emtrends %>% bind_rows(fk_anpp_emtrends)
   write.csv(anova_anpp_df, file=paste0(write_dir,"tables\\anpp lme ANCOVA output_both sites",Sys.Date(),".csv"), row.names=F)
-  write.csv(tb_anpp_emtrends, file=paste0(write_dir,"tables\\anpp emtrends_both sites",Sys.Date(),".csv"), row.names=F)
+  write.csv(emtrends_anpp_df, file=paste0(write_dir,"tables\\anpp emtrends_both sites",Sys.Date(),".csv"), row.names=F)
   
  ###
  ### BNPP models
  ###
  
- ###
- ### Thunder Basin
- ###
- 
- tb_bnpp_model_full <-   anova_t3(IndVars=c('Year','Drought', 'Grazing'),
-                                  DepVar='lnrr_npp',
-                                  RndForm='~1 |Block/Paddock/Plot',
-                                  Data=filter(npp_rr, Year %in% 2019:2023 & Site=="TB" & npp_type=="BNPP")
- ) 
- 
- 
- 
- 
- ## just checking for normality and testing how similar model results are to anovat3 function -- good news is that it is identical
- tb_bnpp_model_noanovaT3fxn <- lme(lnrr_npp ~ Year*Drought*Grazing
-                                   , data=filter(npp_rr, Year %in% 2019:2023 & Site=="TB" & npp_type=="BNPP")
-                                   , random = ~1 |Block/Paddock/Plot
-                                   , correlation=corCompSymm(form = ~1 |Block/Paddock/Plot)
-                                   , control=lmeControl(returnObject=TRUE)
-                                   , na.action = na.omit)
- anova(tb_bnpp_model_noanovaT3fxn, type="marginal")
- summary(tb_bnpp_model_noanovaT3fxn)
- check_model(tb_bnpp_model_noanovaT3fxn)
- 
- ### Split by year
- # 2019
- tb_bnpp_2019_lme <- lme(lnrr_npp ~ Drought*Grazing
-                         , data=filter(npp_rr, Year==2019 & Site=="TB" & npp_type=="BNPP")
-                         , random = ~1 |Block/Paddock/Plot
-                         , na.action = na.omit)
- anova(tb_bnpp_2019_lme, type="marginal")
- 
- # 2020
- tb_bnpp_2020_lme <- lme(lnrr_npp ~ Drought*Grazing
-                         , data=filter(npp_rr, Year==2020 & Site=="TB" & npp_type=="BNPP")
-                         , random = ~1 |Block/Paddock/Plot
-                         , na.action = na.omit)
- anova(tb_bnpp_2020_lme, type="marginal")
- 
- # 2021
- tb_bnpp_2021_lme <- lme(lnrr_npp ~ Drought*Grazing
-                         , data=filter(npp_rr, Year==2021 & Site=="TB" & npp_type=="BNPP")
-                         , random = ~1 |Block/Paddock/Plot
-                         , na.action = na.omit)
- anova(tb_bnpp_2021_lme, type="marginal")
- 
- # 2022
- tb_bnpp_2022_lme <- lme(lnrr_npp ~ Drought*Grazing
-                         , data=filter(npp_rr, Year==2022 & Site=="TB" & npp_type=="BNPP")
-                         , random = ~1 |Block/Paddock/Plot
-                         , na.action = na.omit)
- anova(tb_bnpp_2022_lme, type="marginal")
- 
-
- ### Create model table
- tb_bnpp_model_out <- 
-   as.data.frame(anova(tb_bnpp_2019_lme, type="marginal")) %>% mutate(Year=2019, Data="BNPP", Site="TB", Term=rownames(anova(tb_bnpp_2019_lme))) %>%
-   bind_rows(
-     as.data.frame(anova(tb_bnpp_2020_lme, type="marginal")) %>% mutate(Year=2020, Data="BNPP", Site="TB", Term=rownames(anova(tb_bnpp_2019_lme))),
-     as.data.frame(anova(tb_bnpp_2021_lme, type="marginal")) %>% mutate(Year=2021, Data="BNPP", Site="TB", Term=rownames(anova(tb_bnpp_2019_lme))),
-     as.data.frame(anova(tb_bnpp_2022_lme, type="marginal")) %>% mutate(Year=2022, Data="BNPP", Site="TB", Term=rownames(anova(tb_bnpp_2019_lme))),
-   ) %>%
-   dplyr::select(Data, Site, Year, Term, numDF, denDF, "F-value", "p-value")
- 
- write.csv(tb_bnpp_model_out, file=paste0(write_dir,"tables\\","tb bnpp lme model output by year_",Sys.Date(),".csv"), row.names=F)
- 
- ### Create drought slope table - not using this atm (June 17, 2024)
- tb_bnpp_drought_slopes <- data.frame(
-   Year=2019:2022, 
-   Data="BNPP", 
-   Site="TB",
-   pchange_slope = c(
-     tb_bnpp_2019_lme$coefficients$fixed[2],
-     tb_bnpp_2020_lme$coefficients$fixed[2],
-     tb_bnpp_2021_lme$coefficients$fixed[2],
-     tb_bnpp_2022_lme$coefficients$fixed[2]
-   ),
-   pchange_slope_se = c(
-     summary(tb_bnpp_2019_lme)$tTable[2,2],
-     summary(tb_bnpp_2020_lme)$tTable[2,2],
-     summary(tb_bnpp_2021_lme)$tTable[2,2],
-     summary(tb_bnpp_2022_lme)$tTable[2,2]
-   )
- )
- 
- write.csv(tb_bnpp_drought_slopes, file=paste0(write_dir,"tables\\","tb bnpp drought slope and se from lme_",Sys.Date(),".csv"), row.names=F)
- 
- 
- ###
- ### Fort Keogh
- ###
- 
- fk_bnpp_model_full <-   anova_t3(IndVars=c('Year','Drought', 'Grazing'),
-                                  DepVar='lnrr_npp',
-                                  RndForm='~1 |Block/Paddock/Plot',
-                                  Data=filter(npp_rr, Year %in% 2019:2023 & Site=="FK" & npp_type=="BNPP")
- ) 
- 
- 
- 
- 
- ## just checking for normality and testing how similar model results are to anovat3 function -- good news is that it is identical
- fk_bnpp_model_noanovaT3fxn <- lme(lnrr_npp ~ Year*Drought*Grazing
-                                   , data=filter(npp_rr, Year %in% 2019:2023 & Site=="FK" & npp_type=="BNPP")
-                                   , random = ~1 |Block/Paddock/Plot
-                                   , correlation=corCompSymm(form = ~1 |Block/Paddock/Plot)
-                                   , control=lmeControl(returnObject=TRUE)
-                                   , na.action = na.omit)
- anova(fk_bnpp_model_noanovaT3fxn, type="marginal")
- summary(fk_bnpp_model_noanovaT3fxn)
- check_model(fk_bnpp_model_noanovaT3fxn)
- 
- ### Split by year
- # 2019
- fk_bnpp_2019_lme <- lme(lnrr_npp ~ Drought*Grazing
-                         , data=filter(npp_rr, Year==2019 & Site=="FK" & npp_type=="BNPP")
-                         , random = ~1 |Block/Paddock/Plot
-                         , na.action = na.omit)
- anova(fk_bnpp_2019_lme, type="marginal")
- 
- # 2020
- fk_bnpp_2020_lme <- lme(lnrr_npp ~ Drought*Grazing
-                         , data=filter(npp_rr, Year==2020 & Site=="FK" & npp_type=="BNPP")
-                         , random = ~1 |Block/Paddock/Plot
-                         , na.action = na.omit)
- anova(fk_bnpp_2020_lme, type="marginal")
- 
- # 2021
- fk_bnpp_2021_lme <- lme(lnrr_npp ~ Drought*Grazing
-                         , data=filter(npp_rr, Year==2021 & Site=="FK" & npp_type=="BNPP")
-                         , random = ~1 |Block/Paddock/Plot
-                         , na.action = na.omit)
- anova(fk_bnpp_2021_lme, type="marginal")
- 
- # 2022
- fk_bnpp_2022_lme <- lme(lnrr_npp ~ Drought*Grazing
-                         , data=filter(npp_rr, Year==2022 & Site=="FK" & npp_type=="BNPP")
-                         , random = ~1 |Block/Paddock/Plot
-                         , na.action = na.omit)
- anova(fk_bnpp_2022_lme, type="marginal")
- 
- 
- ### Create model table
- fk_bnpp_model_out <- 
-   as.data.frame(anova(fk_bnpp_2019_lme, type="marginal")) %>% mutate(Year=2019, Data="BNPP", Site="FK", Term=rownames(anova(fk_bnpp_2019_lme))) %>%
-   bind_rows(
-     as.data.frame(anova(fk_bnpp_2020_lme, type="marginal")) %>% mutate(Year=2020, Data="BNPP", Site="FK", Term=rownames(anova(fk_bnpp_2019_lme))),
-     as.data.frame(anova(fk_bnpp_2021_lme, type="marginal")) %>% mutate(Year=2021, Data="BNPP", Site="FK", Term=rownames(anova(fk_bnpp_2019_lme))),
-     as.data.frame(anova(fk_bnpp_2022_lme, type="marginal")) %>% mutate(Year=2022, Data="BNPP", Site="FK", Term=rownames(anova(fk_bnpp_2019_lme))),
-   ) %>%
-   dplyr::select(Data, Site, Year, Term, numDF, denDF, "F-value", "p-value")
- 
- write.csv(fk_bnpp_model_out, file=paste0(write_dir,"tables\\","fk bnpp lme model output by year_",Sys.Date(),".csv"), row.names=F)
- 
- 
- ### Split by grazing in 2022 du to significant interaction
- # light grazign
- fk_bnpp_2022_lg_lme <- lme(lnrr_npp ~ Drought
-                         , data=filter(npp_rr, Year==2022 & Site=="FK" & npp_type=="BNPP" & Grazing == "MLLMM")
-                         , random = ~1 |Block/Paddock/Plot
-                         , na.action = na.omit)
- anova(fk_bnpp_2022_lg_lme, type="marginal")
- 
- # moderate grazing
- fk_bnpp_2022_mg_lme <- lme(lnrr_npp ~ Drought
-                            , data=filter(npp_rr, Year==2022 & Site=="FK" & npp_type=="BNPP" & Grazing == "MMMMM")
-                            , random = ~1 |Block/Paddock/Plot
-                            , na.action = na.omit)
- anova(fk_bnpp_2022_mg_lme, type="marginal")
- 
- # heavy grazing
- fk_bnpp_2022_hg_lme <- lme(lnrr_npp ~ Drought
-                            , data=filter(npp_rr, Year==2022 & Site=="FK" & npp_type=="BNPP" & Grazing == "HHMMM")
-                            , random = ~1 |Block/Paddock/Plot
-                            , na.action = na.omit)
- anova(fk_bnpp_2022_hg_lme, type="marginal")
- 
- ### Create drought slope table
- fk_bnpp_drought_slopes <- data.frame(
-   Year=2019:2022, 
-   Data="BNPP", 
-   Site="fk",
-   pchange_slope = c(
-     fk_bnpp_2019_lme$coefficients$fixed[2],
-     fk_bnpp_2020_lme$coefficients$fixed[2],
-     fk_bnpp_2021_lme$coefficients$fixed[2],
-     fk_bnpp_2022_lme$coefficients$fixed[2]
-   ),
-   pchange_slope_se = c(
-     summary(fk_bnpp_2019_lme)$tTable[2,2],
-     summary(fk_bnpp_2020_lme)$tTable[2,2],
-     summary(fk_bnpp_2021_lme)$tTable[2,2],
-     summary(fk_bnpp_2022_lme)$tTable[2,2]
-   )
- )
- 
- write.csv(fk_bnpp_drought_slopes, file=paste0(write_dir,"tables\\","fk bnpp drought slope and se from lme_",Sys.Date(),".csv"), row.names=F)
- 
-   
-
- 
- 
- ##### tot npp
- 
- ###
- ### Thunder Basin
- ###
- 
- tb_totnpp_model_full <-   anova_t3(IndVars=c('Year','Drought', 'Grazing'),
-                                  DepVar='lnrr_npp',
-                                  RndForm='~1 |Block/Paddock/Plot',
-                                  Data=filter(npp_rr, Year %in% 2019:2023 & Site=="TB" & npp_type=="totNPP")
- ) 
- 
- 
- 
- 
- ## just checking for normality and testing how similar model results are to anovat3 function -- good news is that it is identical
- tb_totnpp_model_noanovaT3fxn <- lme(lnrr_npp ~ Year*Drought*Grazing
-                                   , data=filter(npp_rr, Year %in% 2019:2023 & Site=="TB" & npp_type=="totNPP")
-                                   , random = ~1 |Block/Paddock/Plot
-                                   , correlation=corCompSymm(form = ~1 |Block/Paddock/Plot)
-                                   , control=lmeControl(returnObject=TRUE)
-                                   , na.action = na.omit)
- anova(tb_totnpp_model_noanovaT3fxn, type="marginal")
- summary(tb_totnpp_model_noanovaT3fxn)
- check_model(tb_totnpp_model_noanovaT3fxn)
- 
- ### Split by year
- # 2019
- tb_totnpp_2019_lme <- lme(lnrr_npp ~ Drought*Grazing
-                         , data=filter(npp_rr, Year==2019 & Site=="TB" & npp_type=="totNPP")
-                         , random = ~1 |Block/Paddock/Plot
-                         , na.action = na.omit)
- anova(tb_totnpp_2019_lme, type="marginal")
- 
- # 2020
- tb_totnpp_2020_lme <- lme(lnrr_npp ~ Drought*Grazing
-                         , data=filter(npp_rr, Year==2020 & Site=="TB" & npp_type=="totNPP")
-                         , random = ~1 |Block/Paddock/Plot
-                         , na.action = na.omit)
- anova(tb_totnpp_2020_lme, type="marginal")
- 
- # 2021
- tb_totnpp_2021_lme <- lme(lnrr_npp ~ Drought*Grazing
-                         , data=filter(npp_rr, Year==2021 & Site=="TB" & npp_type=="totNPP")
-                         , random = ~1 |Block/Paddock/Plot
-                         , na.action = na.omit)
- anova(tb_totnpp_2021_lme, type="marginal")
- 
- # 2022
- tb_totnpp_2022_lme <- lme(lnrr_npp ~ Drought*Grazing
-                         , data=filter(npp_rr, Year==2022 & Site=="TB" & npp_type=="totNPP")
-                         , random = ~1 |Block/Paddock/Plot
-                         , na.action = na.omit)
- anova(tb_totnpp_2022_lme, type="marginal")
- 
- 
- ### Create model table
- tb_totnpp_model_out <- 
-   as.data.frame(anova(tb_totnpp_2019_lme, type="marginal")) %>% mutate(Year=2019, Data="totNPP", Site="TB", Term=rownames(anova(tb_totnpp_2019_lme))) %>%
-   bind_rows(
-     as.data.frame(anova(tb_totnpp_2020_lme, type="marginal")) %>% mutate(Year=2020, Data="totNPP", Site="TB", Term=rownames(anova(tb_totnpp_2019_lme))),
-     as.data.frame(anova(tb_totnpp_2021_lme, type="marginal")) %>% mutate(Year=2021, Data="totNPP", Site="TB", Term=rownames(anova(tb_totnpp_2019_lme))),
-     as.data.frame(anova(tb_totnpp_2022_lme, type="marginal")) %>% mutate(Year=2022, Data="totNPP", Site="TB", Term=rownames(anova(tb_totnpp_2019_lme))),
-   ) %>%
-   dplyr::select(Data, Site, Year, Term, numDF, denDF, "F-value", "p-value")
- 
- write.csv(tb_totnpp_model_out, file=paste0(write_dir,"tables\\","tb totnpp lme model output by year_",Sys.Date(),".csv"), row.names=F)
- 
- ### Create drought slope table - not using this atm (June 17, 2024)
- tb_totnpp_drought_slopes <- data.frame(
-   Year=2019:2022, 
-   Data="totNPP", 
-   Site="TB",
-   pchange_slope = c(
-     tb_totnpp_2019_lme$coefficients$fixed[2],
-     tb_totnpp_2020_lme$coefficients$fixed[2],
-     tb_totnpp_2021_lme$coefficients$fixed[2],
-     tb_totnpp_2022_lme$coefficients$fixed[2]
-   ),
-   pchange_slope_se = c(
-     summary(tb_totnpp_2019_lme)$tTable[2,2],
-     summary(tb_totnpp_2020_lme)$tTable[2,2],
-     summary(tb_totnpp_2021_lme)$tTable[2,2],
-     summary(tb_totnpp_2022_lme)$tTable[2,2]
-   )
- )
- 
- write.csv(tb_totnpp_drought_slopes, file=paste0(write_dir,"tables\\","tb totnpp drought slope and se from lme_",Sys.Date(),".csv"), row.names=F)
- 
- 
- ###
- ### Fort Keogh
- ###
- 
- fk_totnpp_model_full <-   anova_t3(IndVars=c('Year','Drought', 'Grazing'),
-                                  DepVar='lnrr_npp',
-                                  RndForm='~1 |Block/Paddock/Plot',
-                                  Data=filter(npp_rr, Year %in% 2019:2023 & Site=="FK" & npp_type=="totNPP")
- ) 
- 
- 
- 
- 
- ## just checking for normality and testing how similar model results are to anovat3 function -- good news is that it is identical
- fk_totnpp_model_noanovaT3fxn <- lme(lnrr_npp ~ Year*Drought*Grazing
-                                   , data=filter(npp_rr, Year %in% 2019:2023 & Site=="FK" & npp_type=="totNPP")
-                                   , random = ~1 |Block/Paddock/Plot
-                                   , correlation=corCompSymm(form = ~1 |Block/Paddock/Plot)
-                                   , control=lmeControl(returnObject=TRUE)
-                                   , na.action = na.omit)
- anova(fk_totnpp_model_noanovaT3fxn, type="marginal")
- summary(fk_totnpp_model_noanovaT3fxn)
- check_model(fk_totnpp_model_noanovaT3fxn)
- 
- ### Split by year
- # 2019
- fk_totnpp_2019_lme <- lme(lnrr_npp ~ Drought*Grazing
-                         , data=filter(npp_rr, Year==2019 & Site=="FK" & npp_type=="totNPP")
-                         , random = ~1 |Block/Paddock/Plot
-                         , na.action = na.omit)
- anova(fk_totnpp_2019_lme, type="marginal")
- 
- # 2020
- fk_totnpp_2020_lme <- lme(lnrr_npp ~ Drought*Grazing
-                         , data=filter(npp_rr, Year==2020 & Site=="FK" & npp_type=="totNPP")
-                         , random = ~1 |Block/Paddock/Plot
-                         , na.action = na.omit)
- anova(fk_totnpp_2020_lme, type="marginal")
- 
- # 2021
- fk_totnpp_2021_lme <- lme(lnrr_npp ~ Drought*Grazing
-                         , data=filter(npp_rr, Year==2021 & Site=="FK" & npp_type=="totNPP")
-                         , random = ~1 |Block/Paddock/Plot
-                         , na.action = na.omit)
- anova(fk_totnpp_2021_lme, type="marginal")
- 
- # 2022
- fk_totnpp_2022_lme <- lme(lnrr_npp ~ Drought*Grazing
-                         , data=filter(npp_rr, Year==2022 & Site=="FK" & npp_type=="totNPP")
-                         , random = ~1 |Block/Paddock/Plot
-                         , na.action = na.omit)
- anova(fk_totnpp_2022_lme, type="marginal")
- 
- 
- ### Create model table
- fk_totnpp_model_out <- 
-   as.data.frame(anova(fk_totnpp_2019_lme, type="marginal")) %>% mutate(Year=2019, Data="totNPP", Site="FK", Term=rownames(anova(fk_totnpp_2019_lme))) %>%
-   bind_rows(
-     as.data.frame(anova(fk_totnpp_2020_lme, type="marginal")) %>% mutate(Year=2020, Data="totNPP", Site="FK", Term=rownames(anova(fk_totnpp_2019_lme))),
-     as.data.frame(anova(fk_totnpp_2021_lme, type="marginal")) %>% mutate(Year=2021, Data="totNPP", Site="FK", Term=rownames(anova(fk_totnpp_2019_lme))),
-     as.data.frame(anova(fk_totnpp_2022_lme, type="marginal")) %>% mutate(Year=2022, Data="totNPP", Site="FK", Term=rownames(anova(fk_totnpp_2019_lme))),
-   ) %>%
-   dplyr::select(Data, Site, Year, Term, numDF, denDF, "F-value", "p-value")
- 
- write.csv(fk_totnpp_model_out, file=paste0(write_dir,"tables\\","fk totnpp lme model output by year_",Sys.Date(),".csv"), row.names=F)
-}
-
-
-###
-### Plotting raw NPP data all together for each site
-###
-
-ggplot(filter(npp_rr, npp_type=="ANPP"), aes(x=Drought, y=lnrr_npp)) + geom_point() + geom_smooth(method="lm") + facet_grid(Site~Year)
-
-
- 
- ###
- ### BNPP:ANPP ratios - calculate, figures, and models
- ###
-{
-rs_ratios <- npp_master %>%
-  filter(Year %in% 2019:2022) %>%
-  filter(npp_type != "totNPP") %>%
-  pivot_wider(names_from="npp_type", values_from="npp_gm2") %>%
-  mutate(root_shoot = BNPP/ANPP) %>%
-  mutate(ln_rs = log(root_shoot))
-
-
-  rsratio_means <- rs_ratios %>%
-    group_by(Year, Site, Drought) %>%
-    summarize(
-      rs_mean=mean(root_shoot, na.rm=T),
-      rs_se = SE_function(root_shoot)
-    )
+  ### Fort Keogh
+  ###
   
-# ggplot(filter(rsratio_means, Site=="TB"), aes(x=Drought, y=rs_mean, ymin=rs_mean-rs_se, ymax=rs_mean+rs_se)) +
-#           geom_errorbar(width=2) +
-#           geom_point(size=3) +
-#           stat_smooth(method="lm",se=F) +
-#           facet_grid(.~Year)
-# 
-# ggsave(file=paste0(write_dir,"figures\\tb root shoot ratios by year_",Sys.Date(),".png"), width=11, height=3.5)
-# 
-# ggplot(filter(rsratio_means, Site=="FK"), aes(x=Drought, y=rs_mean, ymin=rs_mean-rs_se, ymax=rs_mean+rs_se)) +
-#   geom_errorbar(width=2) +
-#   geom_point(size=3) +
-#   stat_smooth(method="lm",se=F) +
-#   facet_grid(.~Year)
-# 
-# ggsave(file=paste0(write_dir,"figures\\fk root shoot ratios by year_",Sys.Date(),".png"), width=11, height=3.5)
-# 
-# ggplot(rsratio_means, aes(x=Drought, y=rs_mean, ymin=rs_mean-rs_se, ymax=rs_mean+rs_se)) +
-#   geom_errorbar(width=2) +
-#   geom_point(size=3) +
-#   stat_smooth(method="lm",se=F) +
-#   facet_grid(Site~Year)
-# ggsave(file=paste0(write_dir,"figures\\both sites root shoot ratios by year_",Sys.Date(),".png"), width=11, height=7)
+  ### BNPP model all years
+  fk_bnpp_model_full <- lme(lnrr_npp ~ as.factor(Year)*Drought+as.factor(Year)*Grazing+Drought*Grazing
+                            , data=filter(npp_rr, Year %in% 2019:2023 & Site=="FK" & npp_type=="BNPP")
+                            , random = ~1 |Block/Paddock/Plot
+                            , correlation=corAR1(form = ~1 |Block/Paddock/Plot)
+                            , control=lmeControl(returnObject=TRUE)
+                            , na.action = na.omit)
+  fk_bnpp_anova <- anova.lme(fk_bnpp_model_full, type="marginal")
+  plot(fk_bnpp_model_full, type=c("p","smooth"), col.line=1)
+  qqnorm(fk_bnpp_model_full, abline = c(0,1)) ## qqplot
+  hist(filter(npp_rr, Year %in% 2019:2023 & Site=="FK" & npp_type=="BNPP")$lnrr_npp)
+  
+  # Only a significant year by grazing interaction, so split by grazing
+  emmeans(fk_bnpp_model_full, "Grazing", by="Year")
+  pairs(emmeans(fk_bnpp_model_full, "Grazing", by="Year")) ## Nothing comes out in the multiple comparison except at p=.09 contrast between H and L grazing in 2019
+  
+  # Save to writable tables
+  fk_bnpp_anova_df <- data.frame(effect=row.names(fk_bnpp_anova), fk_bnpp_anova, site="FK")
 
-rsratio_fig_short_y <- ggplot(rsratio_means, aes(x=Drought, y=rs_mean, ymin=rs_mean-rs_se, ymax=rs_mean+rs_se)) +
-      geom_errorbar(width=2) +
-      geom_point(size=3) +
-      stat_smooth(method="lm",se=F) +
-      facet_wrap(Site~Year, ncol=4) +
-      ylim(0,10)
-pdf(file=paste0(write_dir,"figures\\both sites root shoot ratios by year small ylim_",Sys.Date(),".pdf"), width=11, height=6.5)
-print(rsratio_fig_short_y)
-dev.off()
+  
+  ### Thunder Basin
+  ###
+  
+  ### BNPP model all years
+  tb_bnpp_model_full <- lme(lnrr_npp ~ as.factor(Year)*Drought+as.factor(Year)*Grazing+Drought*Grazing
+                            , data=filter(npp_rr, Year %in% 2019:2023 & Site=="TB" & npp_type=="BNPP")
+                            , random = ~1 |Block/Paddock/Plot
+                            , correlation=corCompSymm(form = ~1 |Block/Paddock/Plot)
+                            , control=lmeControl(returnObject=TRUE)
+                            , na.action = na.omit)
+  tb_bnpp_anova <- anova.lme(tb_bnpp_model_full, type="marginal")
+  plot(tb_bnpp_model_full, type=c("p","smooth"), col.line=1)
+  qqnorm(tb_bnpp_model_full, abline = c(0,1)) ## qqplot
+  hist(filter(npp_rr, Year %in% 2019:2023 & Site=="TB" & npp_type=="BNPP")$lnrr_npp)
+  
+  ### NO significant interactions so we stop here
 
-rsratio_fig_long_y <- ggplot(rsratio_means, aes(x=Drought, y=rs_mean, ymin=rs_mean-rs_se, ymax=rs_mean+rs_se)) +
-  geom_errorbar(width=2) +
-  geom_point(size=3) +
-  stat_smooth(method="lm",se=F) +
-  facet_wrap(Site~Year, ncol=4) +
-  ylim(0,36)
-pdf(file=paste0(write_dir,"figures\\both sites root shoot ratios by year large ylim_",Sys.Date(),".pdf"), width=11, height=6.5)
-print(rsratio_fig_long_y)
-dev.off()
+  
+  
+  ### WRite tables of model output for both sites
+  anova_bnpp_df <- tb_bnpp_anova_df %>% bind_rows(fk_bnpp_anova_df)
+  write.csv(anova_bnpp_df, file=paste0(write_dir,"tables\\bnpp lme ANCOVA output_both sites",Sys.Date(),".csv"), row.names=F)
 
+   
+}
+ 
+###
+### Run models and testing for normality - Raw data
+###
+{
+  ### ANPP data
+  ###
 
-### Running models
-tb_rs_model_full <-   anova_t3(IndVars=c('Year','Drought', 'Grazing'),
-                                 DepVar='ln_rs',
-                                 RndForm='~1 |Block/Paddock/Plot',
-                                 Data=filter(rs_ratios, Year %in% 2019:2022 & Site=="TB")
-)
+    ## Fort Keogh
+    ##
+  fk_anpp_raw_model_full <- lme(log(npp_gm2) ~ as.factor(Year)*Drought+as.factor(Year)*Grazing+Drought*Grazing
+                            , data=filter(npp_master, Year %in% 2019:2023 & Site=="FK" & npp_type=="ANPP")
+                            , random = ~1 |Block/Paddock/Plot
+                            , correlation=corAR1(form = ~1 |Block/Paddock/Plot)
+                            , control=lmeControl(returnObject=TRUE)
+                            , na.action = na.omit)
+  fk_anpp_raw_anova <- anova.lme(fk_anpp_raw_model_full, type="marginal")
+  plot(fk_anpp_raw_model_full, type=c("p","smooth"), col.line=1) # NEEDS TO BE LOG TRANSFORMED -- LOG LOOKS MUCH BETTER
+  qqnorm(fk_anpp_raw_model_full, abline = c(0,1)) ## qqplot
+  hist(log(filter(npp_master, Year %in% 2019:2023 & Site=="FK" & npp_type=="ANPP")$npp_gm2))
+  
+  emtrends(fk_anpp_raw_model_full, "Year", var="Drought")
+  test(emtrends(fk_anpp_raw_model_full, "Year", var="Drought"))
 
-
-
-
-## just checking for normality and testing how similar model results are to anovat3 function 
-
-### Thunder basin
-
-tb_rs_model_noanovaT3fxn <- lme(log(root_shoot) ~ Year*Drought*Grazing
-                                  , data=filter(rs_ratios, Year %in% 2019:2022 & Site=="FK")
-                                  , random = ~1 |Block/Paddock/Plot
-                                  , correlation=corCompSymm(form = ~1 |Block/Paddock/Plot)
-                                  , control=lmeControl(returnObject=TRUE)
-                                  , na.action = na.omit)
-anova(tb_rs_model_noanovaT3fxn)
-summary(tb_rs_model_noanovaT3fxn)
-check_model(tb_rs_model_noanovaT3fxn)
-
-### Split by year
-# 2019
-tb_rs_2019_lme <- lme(ln_rs ~ Drought*Grazing
-                        , data=filter(rs_ratios, Year==2019 & Site=="FK")
-                        , random = ~1 |Block/Paddock/Plot
-                        , na.action = na.omit)
-
-anova(tb_rs_2019_lme)
-anova(tb_rs_2019_lme, type="marginal")
-Anova(tb_rs_2019_lme, type=3)
-
-# 2020
-tb_rs_2020_lme <- lme(ln_rs ~ Drought*Grazing
-                      , data=filter(rs_ratios, Year==2020 & Site=="FK")
-                      , random = ~1 |Block/Paddock/Plot
-                      , na.action = na.omit)
-
-anova(tb_rs_2020_lme)
-anova(tb_rs_2020_lme, type="marginal")
-Anova(tb_rs_2020_lme, type=3)
-
-# 2021
-tb_rs_2021_lme <- lme(ln_rs ~ Drought*Grazing
-                      , data=filter(rs_ratios, Year==2021 & Site=="FK")
-                      , random = ~1 |Block/Paddock/Plot
-                      , na.action = na.omit)
-
-anova(tb_rs_2021_lme)
-anova(tb_rs_2021_lme, type="marginal")
-Anova(tb_rs_2021_lme, type=3)
-
-# 2022
-tb_rs_2022_lme <- lme(ln_rs ~ Drought*Grazing
-                      , data=filter(rs_ratios, Year==2022 & Site=="FK")
-                      , random = ~1 |Block/Paddock/Plot
-                      , na.action = na.omit)
-
-anova(tb_rs_2022_lme)
-anova(tb_rs_2022_lme, type="marginal")
-Anova(tb_rs_2022_lme, type=3)
-
-
-### Create model table
-tb_rs_model_out <- 
-  as.data.frame(anova(tb_rs_2019_lme, type="marginal")) %>% mutate(Year=2019, Data="ANPP", Site="FK", Term=rownames(anova(tb_rs_2019_lme))) %>%
-  bind_rows(
-    as.data.frame(anova(tb_rs_2020_lme, type="marginal")) %>% mutate(Year=2020, Data="ANPP", Site="FK", Term=rownames(anova(tb_rs_2019_lme))),
-    as.data.frame(anova(tb_rs_2021_lme, type="marginal")) %>% mutate(Year=2021, Data="ANPP", Site="FK", Term=rownames(anova(tb_rs_2019_lme))),
-    as.data.frame(anova(tb_rs_2022_lme, type="marginal")) %>% mutate(Year=2022, Data="ANPP", Site="FK", Term=rownames(anova(tb_rs_2019_lme))),
-  ) %>%
-  dplyr::select(Data, Site, Year, Term, numDF, denDF, "F-value", "p-value")
-
-write.csv(tb_rs_model_out, file=paste0(write_dir,"tables\\","tb rs lme model output by year_",Sys.Date(),".csv"), row.names=F)
-
-
-### Fort Keogh
-
-fk_rs_model_noanovaT3fxn <- lme(log(root_shoot) ~ Year*Drought*Grazing
-                                , data=filter(rs_ratios, Year %in% 2019:2022 & Site=="FK")
+  # Save to writable tables
+  fk_anpp_raw_anova_df <- data.frame(effect=row.names(fk_anpp_raw_anova), fk_anpp_raw_anova, site="FK")
+  fk_anpp_raw_emtrends <- data.frame(test(emtrends(fk_anpp_raw_model_full, "Year", var="Drought")),
+                                 site="FK")
+  
+  ### Split by year to get R2 values for significant regressions (I DON'T THINK R2 IS WORKING, ITS GIVING ME 0.99 FOR R2, AND I'M PRETTY SURE THAT IS INCORRECT)
+  # 2019
+  fk_anpp_raw_2019_lme <- lme(log(npp_gm2) ~ Drought
+                          , data=filter(npp_master, Year==2019 & Site=="FK" & npp_type=="ANPP")
+                          , random = ~1 |Block/Paddock/Plot
+                          , na.action = na.omit)
+  anova.lme(fk_anpp_raw_2019_lme, type="marginal")
+  performance::r2(fk_anpp_raw_2019_lme) #  Marginal R2 considers only the variance of the fixed effects, which is what I want
+  # 2020
+  fk_anpp_raw_2020_lme <- lme(log(npp_gm2) ~ Drought
+                          , data=filter(npp_master, Year==2020 & Site=="FK" & npp_type=="ANPP")
+                          , random = ~1 |Block/Paddock/Plot
+                          , na.action = na.omit)
+  anova.lme(fk_anpp_raw_2020_lme, type="marginal")
+  performance::r2(fk_anpp_raw_2020_lme) # R2 OF 1... NOT RIGHT.. Marginal R2 considers only the variance of the fixed effects, which is what I want
+  
+  # 2021
+  fk_anpp_raw_2021_lme <- lme(log(npp_gm2) ~ Drought
+                          , data=filter(npp_master, Year==2021 & Site=="FK" & npp_type=="ANPP")
+                          , random = ~1 |Block/Paddock/Plot
+                          , na.action = na.omit)
+  anova.lme(fk_anpp_raw_2021_lme, type="marginal")
+  performance::r2(fk_anpp_raw_2021_lme) # Marginal R2 considers only the variance of the fixed effects, which is what I want
+  # 2023
+  fk_anpp_raw_2023_lme <- lme(log(npp_gm2) ~ Drought
+                          , data=filter(npp_master, Year==2023 & Site=="FK" & npp_type=="ANPP")
+                          , random = ~1 |Block/Paddock/Plot
+                          , na.action = na.omit)
+  anova.lme(fk_anpp_raw_2023_lme, type="marginal")
+  performance::r2(fk_anpp_raw_2023_lme) # Marginal R2 considers only the variance of the fixed effects, which is what I want
+  
+    ##
+    ## Thunder Basin
+  
+  tb_anpp_raw_model_full <- lme(log(npp_gm2) ~ as.factor(Year)*Drought+as.factor(Year)*Grazing+Drought*Grazing
+                                , data=filter(npp_master, Year %in% 2019:2023 & Site=="TB" & npp_type=="ANPP")
                                 , random = ~1 |Block/Paddock/Plot
-                                , correlation=corCompSymm(form = ~1 |Block/Paddock/Plot)
+                                , correlation=corAR1(form = ~1 |Block/Paddock/Plot)
                                 , control=lmeControl(returnObject=TRUE)
                                 , na.action = na.omit)
-anova(fk_rs_model_noanovaT3fxn)
-summary(fk_rs_model_noanovaT3fxn)
-check_model(fk_rs_model_noanovaT3fxn)
+  tb_anpp_raw_anova <- anova.lme(tb_anpp_raw_model_full, type="marginal")
+  plot(tb_anpp_raw_model_full, type=c("p","smooth"), col.line=1) # NEEDS TO BE LOG TRANSFORMED -- LOG LOOKS MUCH BETTER
+  qqnorm(tb_anpp_raw_model_full, abline = c(0,1)) ## qqplot
+  hist(log(filter(npp_master, Year %in% 2019:2023 & Site=="TB" & npp_type=="ANPP")$npp_gm2))
+  
+  emtrends(tb_anpp_raw_model_full, "Year", var="Drought")
+  test(emtrends(tb_anpp_raw_model_full, "Year", var="Drought"))
+  
+  # Save to writable tables
+  tb_anpp_raw_anova_df <- data.frame(effect=row.names(tb_anpp_raw_anova), tb_anpp_raw_anova, site="TB")
+  tb_anpp_raw_emtrends <- data.frame(test(emtrends(tb_anpp_raw_model_full, "Year", var="Drought")),
+                                     site="TB")
+  
+  ### Split by year to get R2 values for significant regressions 
 
-### Split by year
-# 2019
-fk_rs_2019_lme <- lme(ln_rs ~ Drought*Grazing
-                      , data=filter(rs_ratios, Year==2019 & Site=="FK")
-                      , random = ~1 |Block/Paddock/Plot
-                      , na.action = na.omit)
-
-anova(fk_rs_2019_lme)
-anova(fk_rs_2019_lme, type="marginal")
-Anova(fk_rs_2019_lme, type=3)
-
-# 2020
-fk_rs_2020_lme <- lme(ln_rs ~ Drought*Grazing
-                      , data=filter(rs_ratios, Year==2020 & Site=="FK")
-                      , random = ~1 |Block/Paddock/Plot
-                      , na.action = na.omit)
-
-anova(fk_rs_2020_lme)
-anova(fk_rs_2020_lme, type="marginal")
-Anova(fk_rs_2020_lme, type=3)
-
-# 2021
-fk_rs_2021_lme <- lme(ln_rs ~ Drought*Grazing
-                      , data=filter(rs_ratios, Year==2021 & Site=="FK")
-                      , random = ~1 |Block/Paddock/Plot
-                      , na.action = na.omit)
-
-anova(fk_rs_2021_lme)
-anova(fk_rs_2021_lme, type="marginal")
-Anova(fk_rs_2021_lme, type=3)
-
-# 2022
-fk_rs_2022_lme <- lme(ln_rs ~ Drought*Grazing
-                      , data=filter(rs_ratios, Year==2022 & Site=="FK")
-                      , random = ~1 |Block/Paddock/Plot
-                      , na.action = na.omit)
-
-anova(fk_rs_2022_lme)
-anova(fk_rs_2022_lme, type="marginal")
-Anova(fk_rs_2022_lme, type=3)
-
-
-### Create model table
-fk_rs_model_out <- 
-  as.data.frame(anova(fk_rs_2019_lme, type="marginal")) %>% mutate(Year=2019, Data="ANPP", Site="FK", Term=rownames(anova(fk_rs_2019_lme))) %>%
-  bind_rows(
-    as.data.frame(anova(fk_rs_2020_lme, type="marginal")) %>% mutate(Year=2020, Data="ANPP", Site="FK", Term=rownames(anova(fk_rs_2019_lme))),
-    as.data.frame(anova(fk_rs_2021_lme, type="marginal")) %>% mutate(Year=2021, Data="ANPP", Site="FK", Term=rownames(anova(fk_rs_2019_lme))),
-    as.data.frame(anova(fk_rs_2022_lme, type="marginal")) %>% mutate(Year=2022, Data="ANPP", Site="FK", Term=rownames(anova(fk_rs_2019_lme))),
-  ) %>%
-  dplyr::select(Data, Site, Year, Term, numDF, denDF, "F-value", "p-value")
-
-write.csv(fk_rs_model_out, file=paste0(write_dir,"tables\\","fk rs lme model output by year_",Sys.Date(),".csv"), row.names=F)
-
-
-
-
-
+    # 2020
+  tb_anpp_raw_2020_lme <- lme(log(npp_gm2) ~ Drought
+                              , data=filter(npp_master, Year==2020 & Site=="TB" & npp_type=="ANPP")
+                              , random = ~1 |Block/Paddock/Plot
+                              , na.action = na.omit)
+  anova.lme(tb_anpp_raw_2020_lme, type="marginal")
+  performance::r2(tb_anpp_raw_2020_lme) # R2 OF 1... NOT RIGHT.. Marginal R2 considers only the variance of the fixed effects, which is what I want
+  
+  # 2021
+  tb_anpp_raw_2021_lme <- lme(log(npp_gm2) ~ Drought
+                              , data=filter(npp_master, Year==2021 & Site=="TB" & npp_type=="ANPP")
+                              , random = ~1 |Block/Paddock/Plot
+                              , na.action = na.omit)
+  anova.lme(tb_anpp_raw_2021_lme, type="marginal")
+  performance::r2(tb_anpp_raw_2021_lme) # Marginal R2 considers only the variance of the fixed effects, which is what I want
+  
+  
+  ### Write tables of model output for both sites
+  anova_anpp_raw_df <- tb_anpp_raw_anova_df %>% bind_rows(fk_anpp_raw_anova_df)
+  emtrends_anpp_raw_df <- tb_anpp_raw_emtrends %>% bind_rows(fk_anpp_raw_emtrends)
+  write.csv(anova_anpp_raw_df, file=paste0(write_dir,"tables\\anpp raw lme ANCOVA output_both sites",Sys.Date(),".csv"), row.names=F)
+  write.csv(emtrends_anpp_raw_df, file=paste0(write_dir,"tables\\anpp raw emtrends_both sites",Sys.Date(),".csv"), row.names=F)
+  
+  ### BNPP data
+  ###
+  
+  ## Fort Keogh
+  ##
+  fk_bnpp_raw_model_full <- lme(log(npp_gm2) ~ as.factor(Year)*Drought+as.factor(Year)*Grazing+Drought*Grazing
+                                , data=filter(npp_master, Year %in% 2019:2023 & Site=="FK" & npp_type=="BNPP")
+                                , random = ~1 |Block/Paddock/Plot
+                                , correlation=corAR1(form = ~1 |Block/Paddock/Plot)
+                                , control=lmeControl(returnObject=TRUE)
+                                , na.action = na.omit)
+  fk_bnpp_raw_anova <- anova.lme(fk_bnpp_raw_model_full, type="marginal")
+  plot(fk_bnpp_raw_model_full, type=c("p","smooth"), col.line=1) # NEEDS TO BE LOG TRANSFORMED -- LOG LOOKS MUCH BETTER
+  qqnorm(fk_bnpp_raw_model_full, abline = c(0,1)) ## qqplot
+  hist(log(filter(npp_master, Year %in% 2019:2023 & Site=="FK" & npp_type=="BNPP")$npp_gm2))
+  
+  ## NO SIGNIFICANT INTERACTIONS SO STOP HERE
+  
+  # Save to writable tables
+  fk_bnpp_raw_anova_df <- data.frame(effect=row.names(fk_bnpp_raw_anova), fk_bnpp_raw_anova, site="FK")
+  
+  
+  ##
+  ## Thunder Basin
+  
+  tb_bnpp_raw_model_full <- lme(log(npp_gm2) ~ as.factor(Year)*Drought+as.factor(Year)*Grazing+Drought*Grazing
+                                , data=filter(npp_master, Year %in% 2019:2023 & Site=="TB" & npp_type=="BNPP")
+                                , random = ~1 |Block/Paddock/Plot
+                                , correlation=corAR1(form = ~1 |Block/Paddock/Plot)
+                                , control=lmeControl(returnObject=TRUE)
+                                , na.action = na.omit)
+  tb_bnpp_raw_anova <- anova.lme(tb_bnpp_raw_model_full, type="marginal")
+  plot(tb_bnpp_raw_model_full, type=c("p","smooth"), col.line=1) # NEEDS TO BE LOG TRANSFORMED -- LOG LOOKS MUCH BETTER
+  qqnorm(tb_bnpp_raw_model_full, abline = c(0,1)) ## qqplot
+  hist(log(filter(npp_master, Year %in% 2019:2023 & Site=="TB" & npp_type=="BNPP")$npp_gm2))
+  
+  emmeans(tb_bnpp_raw_model_full, "Grazing", by="Year")
+  pairs(emmeans(tb_bnpp_raw_model_full, "Grazing", by="Year")) ## Nothing comes out in the multiple comparison
+  emtrends(tb_bnpp_raw_model_full, "Year", var="Drought") ## No significant interaction, but I'm curious -- did come out with a sig negative drought trend in 2020... but I think we stop here since no significant interaction
+  test(emtrends(tb_bnpp_raw_model_full, "Year", var="Drought"))
+  
+  # Save to writable tables
+  tb_bnpp_raw_anova_df <- data.frame(effect=row.names(tb_bnpp_raw_anova), tb_bnpp_raw_anova, site="TB")
+                                     
+  
+  
+  ### Write tables of model output for both sites
+  anova_bnpp_raw_df <- tb_bnpp_raw_anova_df %>% bind_rows(fk_bnpp_raw_anova_df)
+  write.csv(anova_bnpp_raw_df, file=paste0(write_dir,"tables\\bnpp raw lme ANCOVA output_both sites",Sys.Date(),".csv"), row.names=F)
 }
 
 ###
-### ANPP by functional groups - models and plotting
+### Plotting ANPP and BNPP ln(RR) by drought
 ###
 {
-  anpp_fxn_grps <- anpp_fk_plot_means %>%
-    dplyr::select(-dead, -litter, -subshrub_shrub, -ANPP_gm2) %>%
-    pivot_longer(cols=C4P_gm2:Forb_gm2,names_to="fxn_type") %>%
-  bind_rows(
-    anpp_tb_plot_means %>%
-      dplyr::select(-StandingDead_gm2, -Vulpia_gm2, -Bromus_gm2, -ANPP_gm2) %>%
-      pivot_longer(cols=C3P_gm2:AnnualGrass_gm2,names_to="fxn_type")
-  ) %>%
-    rename(ANPP_gm2=value)
+  npp_rr_drought_means <- npp_rr %>%
+    filter(Year %in% 2019:2023) %>% ### plot 44 is a clear outlier
+    group_by(Site, Year, npp_type, Drought) %>%
+    summarize_at(.vars=vars(lnrr_npp), .funs=list(mean=mean, se=SE_function), na.rm=T) %>%
+    ungroup() %>%
+    rename(npp_mean = mean, npp_se = se)
   
-  ## Running models for different functional groups (NEED TO PUT THESE IN A TABLE)
-  # Thunder basin overall models
+  npp_fig <- ggplot(filter(npp_rr_drought_means,Year%in%2019:2023 & npp_type %in% c("ANPP","BNPP")), 
+                    aes(x=Drought, y=npp_mean, ymin=npp_mean-npp_se, ymax=npp_mean+npp_se, fill=npp_type, shape=npp_type))+
+    scale_shape_manual(values=c(21,24))+
+    scale_fill_manual(values=c("springgreen3","saddlebrown")) +
+    scale_color_manual(values=c("springgreen3","saddlebrown")) +
+    geom_hline(yintercept=0, col="grey") +
+    geom_smooth(inherit.aes=F, data=filter(npp_rr,Year%in%2019:2023&npp_type %in% c("ANPP", "BNPP")),
+                aes(Drought, lnrr_npp, col=npp_type), method="lm",se=F) +
+    geom_errorbar(width=3) +
+    geom_point(size=2, col="black") +
+    facet_grid(Site~Year) +
+    xlab("Rainfall reduction (%)") + ylab("Net primary productivity (g/m2)") +
+    theme_few()
   
-  fxn_vec <- unique(anpp_fxn_grps$fxn_type)
-  
-  for(FXN in 1:length(fxn_vec)){
-    df_temp
-    
-  }
-  fk_C3P_full_model <- lme(ANPP_gm2 ~ Drought*Grazing + Drought*as.factor(Year) + Grazing*as.factor(Year)
-                           , data=filter(anpp_fxn_grps, Year != 2018 & fxn_type=="C3P_gm2" & Site=="FK")
-                           , random = ~1 |Block/Paddock
-                           , na.action = na.omit)
-  anova(fk_C3P_full_model, type="marginal")
-
-  tb_C3P_full_model <- lme(C3P_gm2 ~ Drought*Grazing + Drought*as.factor(Year) + Grazing*as.factor(Year)
-                               , data=filter(anpp_tb_plot_means, Year != 2018)
-                               , random = ~1 |Block/Paddock
-                               , na.action = na.omit)
-  anova(tb_C3P_full_model, type="marginal")
-  
-  ### Testing anova_t3 function again -- similar output but main effects are weaker here -- potentially because den df are reduced by including the 3 way interactions
-  anpp_tb_plot_means$Year <- as.factor(anpp_tb_plot_means$Year)
-  anova_t3(IndVars=c('Year','Drought', 'Grazing'),
-           DepVar='C3P_gm2',
-           RndForm='~1 |Block/Paddock',
-           Data=anpp_tb_plot_means
-  )
-  
-  tb_C4P_full_model <- lme(C4P_gm2 ~ Drought*Grazing + Drought*as.factor(Year) + Grazing*as.factor(Year)
-                           , data=filter(anpp_tb_plot_means, Year != 2018)
-                           , random = ~1 |Block/Paddock
-                           , na.action = na.omit)
-  anova(tb_C4P_full_model, type="marginal")
-  
-  tb_Forb_full_model <- lme(Forb_gm2 ~ Drought*Grazing + Drought*as.factor(Year) + Grazing*as.factor(Year)
-                            , data=filter(anpp_tb_plot_means, Year != 2018)
-                            , random = ~1 |Block/Paddock
-                           , na.action = na.omit)
-  anova(tb_Forb_full_model, type="marginal")
-  
-  tb_AnnualGrass_full_model <- lme(AnnualGrass_gm2 ~ Drought*Grazing + Drought*as.factor(Year) + Grazing*as.factor(Year)
-                            , data=filter(anpp_tb_plot_means, Year != 2018)
-                            , random = ~1 |Block/Paddock
-                            , na.action = na.omit)
-  anova(tb_AnnualGrass_full_model, type="marginal")
-  
-  
-  ggplot(anpp_tb_plot_means, aes(x=Drought, y=AnnualGrass_gm2, col=Grazing)) +
-    geom_point() +
-    geom_smooth(method="lm",se=F) +
-    facet_wrap(~Year)
-
-  # Fort Keogh overall models
-  fk_C3P_full_model <- lme(ANPP_gm2 ~ Drought*Grazing + Drought*as.factor(Year) + Grazing*as.factor(Year)
-                           , data=filter(anpp_fxn_grps, Year != 2018 & fxn_type=="C3P_gm2" & Site=="FK")
-                           , random = ~1 |Block/Paddock
-                           , na.action = na.omit)
-  anova(fk_C3P_full_model, type="marginal")
-  
-  fk_C4P_full_model <- lme(ANPP_gm2 ~ Drought*Grazing + Drought*as.factor(Year) + Grazing*as.factor(Year)
-                           , data=filter(anpp_fxn_grps, Year != 2018 & fxn_type=="C4P_gm2" & Site=="FK")
-                           , random = ~1 |Block/Paddock
-                           , na.action = na.omit)
-  anova(fk_C4P_full_model, type="marginal")
-
-  fk_AnnualGrass_full_model <- lme(ANPP_gm2 ~ Drought*Grazing + Drought*as.factor(Year) + Grazing*as.factor(Year)
-                           , data=filter(anpp_fxn_grps, Year != 2018 & fxn_type=="AnnualGrass_gm2" & Site=="FK")
-                           , random = ~1 |Block/Paddock
-                           , na.action = na.omit)
-  anova(fk_AnnualGrass_full_model, type="marginal")
-  
-  fk_Forb_full_model <- lme(ANPP_gm2 ~ Drought*Grazing + Drought*as.factor(Year) + Grazing*as.factor(Year)
-                           , data=filter(anpp_fxn_grps, Year != 2018 & fxn_type=="Forb_gm2" & Site=="FK")
-                           , random = ~1 |Block/Paddock
-                           , na.action = na.omit)
-  anova(fk_Forb_full_model, type="marginal")
-  
-  
-  
-  
-  ## Plotting functional group rel cov
-  anpp_relanpp_fxn <- anpp_fxn_grps %>%
-    group_by(Year, Site, Block, Paddock, Drought, Grazing, Plot) %>%
-    mutate(rel_ANPP = ANPP_gm2/sum(ANPP_gm2))
-
-  anpp_relanpp_fxn_drt_means <- anpp_fxn_grps %>%
-    group_by(Year, Site, Drought, fxn_type) %>%
-    summarize(ANPP_gm2 = mean(ANPP_gm2, na.rm=T)) %>%
-    group_by(Year, Site, Drought) %>%
-    mutate(rel_ANPP = ANPP_gm2/sum(ANPP_gm2))
-
-  fxn_grp_plot <- ggplot(anpp_relanpp_fxn_drt_means, aes(x=factor(Drought), y=rel_ANPP, fill=fxn_type)) +
-    geom_col() +
-    theme_few() +
-    facet_grid(Site ~ Year)
-
-  pdf(file=paste0(write_dir, "figures\\fxn group rel abundance plot", Sys.Date(),".pdf"), width=10, height=3.5)
-  print(fxn_grp_plot)
+  pdf(paste0(write_dir,"figures//anpp and bnpp response ratios_v1_",Sys.Date(),".pdf"), width=10.5, height=4.5, useDingbats = F)
+  print(npp_fig)
   dev.off()
 
-  
-  annual_plot_means <- anpp_fxn_grps %>%
-    group_by(Year, Site, Drought, fxn_type) %>%
-    summarize_at(vars(ANPP_gm2), .funs=list(mean = mean, se = SE_function)) %>%
-    ungroup()
-  
-  
-  ggplot(filter(annual_plot_means, fxn_type=="AnnualGrass_gm2"&Site=="FK"), aes(x=Drought, y=mean, ymin=mean-se, ymax=mean+se)) +
-    geom_errorbar(width=1) +
-    geom_point(size=2) +
-    theme_few() +
-    facet_grid(.~Year)
-
-  ggplot(filter(annual_plot_means, fxn_type=="C3P_gm2"&Site=="FK"), aes(x=Drought, y=mean, ymin=mean-se, ymax=mean+se)) +
-    geom_errorbar(width=1) +
-    geom_point(size=2) +
-    theme_few() +
-    facet_grid(.~Year)
-
-  ggplot(filter(annual_plot_means, fxn_type=="C4P_gm2"&Site=="FK"), aes(x=Drought, y=mean, ymin=mean-se, ymax=mean+se)) +
-    geom_errorbar(width=1) +
-    geom_point(size=2) +
-    theme_few() +
-    facet_grid(.~Year)
-
-  ggplot(filter(annual_plot_means, fxn_type=="Forb_gm2"&Site=="FK"), aes(x=Drought, y=mean, ymin=mean-se, ymax=mean+se)) +
-    geom_errorbar(width=1) +
-    geom_point(size=2) +
-    theme_few() +
-    facet_grid(.~Year)
-
-  ggplot(filter(annual_plot_means, fxn_type=="AnnualGrass_gm2"&Site=="FK"), aes(x=Drought, y=mean)) +
-    geom_jitter(width=2) +
-    theme_few() +
-    facet_grid(.~Year)
-  
-  ggplot(filter(annual_plot_means, Site=="FK" & Year==2023), aes(x=Drought, y=mean, ymin=mean-se, ymax=mean+se)) +
-    geom_errorbar(width=1) +
-    geom_point(size=2) +
-    theme_few() 
-
-  ggplot(filter(annual_plot_means, Site=="FK" & Year==2023), aes(x=Drought, y=mean, ymin=mean-se, ymax=mean+se)) +
-    geom_errorbar(width=1) +
-    geom_point(size=2) +
-    theme_few() 
-  
-    with(filter(anpp_fxn_grps, fxn_type=="AnnualGrass_gm2"&Site=="FK"), table(Year, Drought))
-    
-    
-### Calculating Functional group response ratios
-    anpp_fxn_controls <- anpp_fxn_grps %>%
-      filter(Drought==0) %>%
-      group_by(Site, Year, Block, Paddock, fxn_type) %>%
-      summarize(ctrl_anpp=mean(ANPP_gm2, na.rm=T)
-      )
-    
-    anpp_fxn_rr <- anpp_fxn_grps %>%
-      dplyr::select(-slope_simple) %>%
-      filter(Drought != 0) %>%
-      full_join(anpp_fxn_controls, by=c("Year","Site","Block","Paddock", "fxn_type")) %>%
-      mutate(lnrr_anpp=log((ANPP_gm2+0.01)/(ctrl_anpp+0.01)), 
-             pchange_anpp=((ANPP_gm2+0.01)-(ctrl_anpp+0.01))/(ctrl_anpp+0.01),
-             diff_anpp = ANPP_gm2-ctrl_anpp) 
-
-  ## quick plots  
-    ggplot(filter(anpp_fxn_rr,fxn_type=="C4P_gm2"), aes(x=Drought, y=lnrr_anpp)) +
-      geom_hline(yintercept=0, col="grey") +
-      geom_point() +
-      geom_smooth(method="lm",se=F) +
-      facet_grid(Site~Year)
-    ggplot(filter(anpp_fxn_rr,fxn_type=="C3P_gm2"), aes(x=Drought, y=diff_anpp)) +
-      geom_hline(yintercept=0, col="grey") +
-      geom_point() +
-      geom_smooth(method="lm",se=F) +
-      facet_grid(Site~Year)
-    ggplot(filter(anpp_fxn_rr,fxn_type=="Forb_gm2"), aes(x=Drought, y=lnrr_anpp)) +
-      geom_hline(yintercept=0, col="grey") +
-      geom_point() +
-      geom_smooth(method="lm",se=F) +
-      facet_grid(Site~Year)
-    ggplot(filter(anpp_fxn_rr,fxn_type=="AnnualGrass_gm2"), aes(x=Drought, y=diff_anpp)) +
-      geom_hline(yintercept=0, col="grey") +
-      geom_point() +
-      geom_smooth(method="lm",se=F) +
-      facet_grid(Site~Year)
-    
-    # Calculate means and se for response ratios and difference measures
-    anpp_rr_fxn_means <- anpp_fxn_rr %>%
-      group_by(Year, Site, Drought, fxn_type) %>%
-      summarize_at(vars(lnrr_anpp, pchange_anpp, diff_anpp), .funs=list(mean = mean, se = SE_function)) %>%
-      ungroup()
-    
-    ## Plot means and ses
-    ggplot(filter(anpp_rr_fxn_means, fxn_type=="AnnualGrass_gm2"&Year!=2018), aes(x=Drought, y=diff_anpp_mean, ymin=diff_anpp_mean-diff_anpp_se, ymax=diff_anpp_mean+diff_anpp_se)) +
-      geom_hline(yintercept=0, col="grey") +
-      geom_errorbar(width=1) +
-      geom_point(size=2) +
-      geom_smooth(method="lm",se=F) +
-      theme_few() +
-      facet_grid(Site~Year)
-    
-  fxn_diff_plot <-  ggplot(filter(anpp_rr_fxn_means,Year!=2018), aes(x=Drought, y=diff_anpp_mean, ymin=diff_anpp_mean-diff_anpp_se, ymax=diff_anpp_mean+diff_anpp_se, col=fxn_type, fill=fxn_type, pch=fxn_type)) +
-            geom_hline(yintercept=0, col="grey") +
-            geom_errorbar(width=1) +
-            geom_point(size=2, col="black") +
-            geom_smooth(method="lm",se=F) +
-            scale_shape_manual(values=21:24) +
-            theme_few() +
-            facet_grid(Site~Year)
-  
-  pdf(paste0(write_dir,"figures//anpp diff by functional group_",Sys.Date(),".pdf"), useDingbats = F, width=11.5, height=4.25)
-  print(fxn_diff_plot)
-  dev.off()
 }
 
-# response ratio
-ggplot(filter(anpp_rr_fxn_means,Year!=2018), aes(x=Drought, y=lnrr_anpp_mean, ymin=lnrr_anpp_mean-lnrr_anpp_se, ymax=lnrr_anpp_mean+lnrr_anpp_se, col=fxn_type, fill=fxn_type, pch=fxn_type)) +
-  geom_hline(yintercept=0, col="grey") +
-  geom_errorbar(width=1) +
-  geom_point(size=2, col="black") +
-  geom_smooth(method="lm",se=F) +
-  scale_shape_manual(values=21:24) +
-  theme_few() +
-  facet_grid(Site~Year)
 
-# percent change
-ggplot(filter(anpp_rr_fxn_means,Year!=2018), aes(x=Drought, y=pchange_anpp_mean, ymin=pchange_anpp_mean-pchange_anpp_se, ymax=pchange_anpp_mean+pchange_anpp_se, col=fxn_type, fill=fxn_type, pch=fxn_type)) +
-  geom_hline(yintercept=0, col="grey") +
-  geom_errorbar(width=1) +
-  geom_point(size=2, col="black") +
-  geom_smooth(method="lm",se=F) +
-  scale_shape_manual(values=21:24) +
-  theme_few() +
-  ylim(-200,200) +
-  facet_grid(Site~Year)
-### Calculate and plot compensation metric (annuals compensating for C3 reductions)
-anpp_fxn_grps <- anpp_fxn_grps %>%
-  mutate(Block_Paddock=paste(Block, Paddock, sep="_"))
-
-install.packages("groupedstats")
-library(groupedstats)
-
-fxn_grp_drt_slopes <- anpp_fxn_grps %>% 
-  group_by(Site, Year, Block, Paddock, fxn_type) %>%
-  do(tidy(lm(ANPP_gm2 ~ Drought, .))) %>%
-  filter(term=="Drought") %>%
-  ungroup()
-
-ggplot(filter(fxn_grp_drt_slopes,fxn_type=="AnnualGrass_gm2"), aes(x=estimate))+
-  geom_histogram() +
-  facet_wrap(Site~Year) +
-  xlim(-1,1) +
-  geom_vline(xintercept=0)
-
-ggplot(filter(fxn_grp_drt_slopes,fxn_type=="C3P_gm2"), aes(x=estimate))+
-  geom_histogram() +
-  facet_wrap(Site~Year) +
-  xlim(-1,1) +
-  geom_vline(xintercept=0)
-
-compensation_df <- fxn_grp_drt_slopes %>%
-  dplyr::select(-std.error, -statistic, -p.value) %>%
-  pivot_wider(names_from=fxn_type, values_from=estimate) %>%
-  mutate(ann_c3p_comp = (AnnualGrass_gm2/C3P_gm2)*(-1)) %>%
-  mutate(high_low_comp = (pmax(AnnualGrass_gm2,C3P_gm2,C4P_gm2,Forb_gm2)/
-           pmin(AnnualGrass_gm2,C3P_gm2,C4P_gm2,Forb_gm2))*(-1))
-
-compensation_means <- compensation_df %>%
-  group_by(Site, Year) %>%
-  summarize_at(.vars=vars("ann_c3p_comp","high_low_comp"), .funs=list(mean=mean, se=SE_function)) %>%
-  ungroup()
-
-ann_c3p_comp_fig <- ggplot(filter(compensation_means,Year!=2018), 
-                   aes(Year, ann_c3p_comp_mean, ymin=ann_c3p_comp_mean-ann_c3p_comp_se, 
-                       ymax=ann_c3p_comp_mean+ann_c3p_comp_se)) +
-  geom_hline(yintercept=1, col="grey") +
-  geom_path() +
-  geom_errorbar(width=0.1) +
-  geom_point(size=2) +
-  facet_wrap(~Site) +
-  theme_few() +
-  ylab("Fxn Group Compensation -(mAnn/mC3P)")
-
-high_low_comp_fig <- ggplot(filter(compensation_means,Year %in% 2021:2023), 
-                           aes(Year, high_low_comp_mean, ymin=high_low_comp_mean-high_low_comp_se, 
-                               ymax=high_low_comp_mean+high_low_comp_se)) +
-  geom_hline(yintercept=1, col="grey") +
-  geom_path() +
-  geom_errorbar(width=0.1) +
-  geom_point(size=2) +
-  facet_wrap(~Site) +
-  theme_few() +
-  ylab("Fxn Group Compensation -(mhigh/mlow)")
-
-pdf(file=paste0(write_dir,"figures\\compensation fig_",Sys.Date(),".pdf"), width=6, height=3.5, useDingbats = F)
-print(comp_fig)
-dev.off()
-
-
-ggplot(compensation_df, aes(Year, ann_c3p_comp)) +
-  geom_point() +
-  facet_wrap(~Site) +
-#  ylim(-10,10) +
-  geom_hline(yintercept=0)
-
-ggplot(filter(anpp_fxn_grps, fxn_type=="AnnualGrass_gm2" & Site=="FK"), aes(x=Drought, y=ANPP_gm2, col=Block_Paddock)) +
-  geom_point() +
-  geom_smooth(method="lm",se=F) +
-  facet_grid(.~Year) +
-  ylim(0,150)
-
-ggplot(filter(fxn_anpp_compens, Site=="FK"), aes(x=Drought, y=c3_ann_comp)) +
-  geom_jitter(width=2) +
-  theme_few() +
-  facet_grid(.~Year)
-
-hist(log(fxn_anpp_compens$c3_ann_comp))
-
-
-
-
-### Simulation for assessing how compensation metric varies across a gradient of slopes
-max(abs(compensation_df$AnnualGrass_gm2))
-
-sim_master <- {}
-slope_vec <- seq(-2.2,2.2,by=.1)
-
-for(SLOPE in 1:length(slope_vec)){
-sim_temp <- data.frame(
-  slope_x = slope_vec[SLOPE],
-  slope_y = slope_vec
-  )
-sim_master <- rbind(sim_master, sim_temp)
-rm(sim_temp)
-}
-
-sim_master <- sim_master %>%
-  mutate(compensation_metric = -(slope_y/slope_x))
-
-ggplot(sim_master, aes(x=slope_x, y=slope_y)) +
-  geom_tile(aes(fill=compensation_metric)) +
-#  scale_fill_gradient(low = "white", high = "orange", name="Compensation")
-  scale_fill_gradient(low = "blue", high = "yellow", limits=c(-5,5), oob=scales::squish, name="Compensation")
-
-
+###
+### Plotting raw ANPP and BNPP by drought
+###
+{
 
 ### Calculate means by drought only
-anpp_tb_drt_means <- anpp_tb_plot_means %>%
-  group_by(Year, Site, Drought) %>%
-  summarize_at(vars(c(C3P_gm2:ANPP_gm2, AnnualGrass_gm2)),.funs = c(mean, SE_function),na.rm=TRUE) %>% 
-  rename(C3P_mean=C3P_gm2_fn1, C3P_se=C3P_gm2_fn2,
-         C4P_mean=C4P_gm2_fn1, C4P_se=C4P_gm2_fn2,
-         Forb_mean=Forb_gm2_fn1, Forb_se=Forb_gm2_fn2,
-         ANPP_mean=ANPP_gm2_fn1, ANPP_se=ANPP_gm2_fn2,
-         AnnualGrass_mean=AnnualGrass_gm2_fn1, AnnualGrass_se=AnnualGrass_gm2_fn2)
+npp_drt_means <- npp_master %>%
+  group_by(Year, Site, npp_type, Drought) %>%
+  summarize_at(vars(c(npp_gm2)),.funs = c(mean=mean, se=SE_function),na.rm=TRUE) %>% 
+  ungroup() %>%
+  rename(npp_mean=mean,
+         npp_se=se)
 
-ggplot(anpp_tb_drt_means, aes(x=Drought, y=ANPP_mean, ymin=ANPP_mean-ANPP_se, ymax=ANPP_mean+ANPP_se)) +
+anpp_raw_fig <- ggplot(filter(npp_drt_means,Year %in%2019:2023 & npp_type == "ANPP"),
+                      aes(x=Drought, y=npp_mean, ymin=npp_mean-npp_se, ymax=npp_mean+npp_se)) +
+                geom_errorbar(width=1) +
+                geom_point() +
+                geom_smooth(method="lm",se=F) +
+                facet_grid(Site~Year) +
+                ylab("ANPP g/m2") + xlab("Rainfall reduction (%)") +
+                theme_few()
+
+pdf(paste0(write_dir, "figures//raw anpp figure", Sys.Date(), ".pdf"), width=9, height=4.5, useDingbats = F)
+print(anpp_raw_fig)
+dev.off()
+
+ggsave(filename=paste0(write_dir, "figures//raw anpp figure", Sys.Date(), ".jpeg"), plot=anpp_raw_fig, width=9, height=4.5, units="in", dpi=300)
+
+bnpp_raw_fig <- ggplot(filter(npp_drt_means,Year %in%2019:2023 & npp_type == "BNPP"),
+                       aes(x=Drought, y=npp_mean, ymin=npp_mean-npp_se, ymax=npp_mean+npp_se)) +
   geom_errorbar(width=1) +
   geom_point() +
   geom_smooth(method="lm",se=F) +
-  facet_grid(cols=vars(Year), scales="free_y") +
-  xlim(0,100) +
-  ylab("ANPP g/m2") + xlab("Drought magnitude (% ppt reduction)")
-ggsave("..\\..\\figures\\ANPP\\tb_TotANPP_18-23.png", width=9, height=3, units="in")
+  facet_grid(Site~Year, scales="free_y") +
+  ylab("BNPP g/m2") + xlab("Rainfall reduction (%)") +
+  theme_few()
+
+pdf(paste0(write_dir, "figures//raw bnpp figure", Sys.Date(), ".pdf"), width=9, height=4.5, useDingbats = F)
+print(bnpp_raw_fig)
+dev.off()
+
+ggsave(filename=paste0(write_dir, "figures//raw bnpp figure", Sys.Date(), ".jpeg"), plot=bnpp_raw_fig, width=9, height=4.5, units="in", dpi=300)
+}
+
+
+
+
+
+
+
 
 ### Plots of different functional groups
 ggplot(anpp_tb_drt_means, aes(x=Drought, y=C3P_mean, ymin=C3P_mean-C3P_se, ymax=C3P_mean+C3P_se)) +
