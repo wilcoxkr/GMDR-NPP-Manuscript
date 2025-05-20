@@ -399,14 +399,14 @@ write.csv(npp_master, file=paste0(write_dir,"data_sets\\ANPP BNPP total NPP_plot
     # 2019
   fk_anpp_2019_lme <- lme(lnrr_npp ~ Drought
                           , data=filter(npp_rr, Year==2019 & Site=="FK" & npp_type=="ANPP")
-                          , random = ~1 |Block/Paddock/Plot
+                          , random = ~1 |Block/Paddock
                           , na.action = na.omit)
   anova.lme(fk_anpp_2019_lme, type="marginal")
   performance::r2(fk_anpp_2019_lme) # Marginal R2 considers only the variance of the fixed effects, which is what I want
     # 2020
   fk_anpp_2020_lme <- lme(lnrr_npp ~ Drought
                           , data=filter(npp_rr, Year==2020 & Site=="FK" & npp_type=="ANPP")
-                          , random = ~1 |Block/Paddock/Plot
+                          , random = ~1 |Block/Paddock
                           , na.action = na.omit)
   anova.lme(fk_anpp_2020_lme, type="marginal")
   performance::r2(fk_anpp_2020_lme) # Marginal R2 considers only the variance of the fixed effects, which is what I want
@@ -414,14 +414,14 @@ write.csv(npp_master, file=paste0(write_dir,"data_sets\\ANPP BNPP total NPP_plot
   # 2021
   fk_anpp_2021_lme <- lme(lnrr_npp ~ Drought
                           , data=filter(npp_rr, Year==2021 & Site=="FK" & npp_type=="ANPP")
-                          , random = ~1 |Block/Paddock/Plot
+                          , random = ~1 |Block/Paddock
                           , na.action = na.omit)
   anova.lme(fk_anpp_2021_lme, type="marginal")
   performance::r2(fk_anpp_2021_lme) # Marginal R2 considers only the variance of the fixed effects, which is what I want
   # 2023
   fk_anpp_2023_lme <- lme(lnrr_npp ~ Drought
                           , data=filter(npp_rr, Year==2023 & Site=="FK" & npp_type=="ANPP")
-                          , random = ~1 |Block/Paddock/Plot
+                          , random = ~1 |Block/Paddock
                           , na.action = na.omit)
   anova.lme(fk_anpp_2023_lme, type="marginal")
   performance::r2(fk_anpp_2023_lme) # Marginal R2 considers only the variance of the fixed effects, which is what I want
@@ -454,7 +454,7 @@ write.csv(npp_master, file=paste0(write_dir,"data_sets\\ANPP BNPP total NPP_plot
   # 2020
   tb_anpp_2020_lme <- lme(lnrr_npp ~ Drought
                           , data=filter(npp_rr, Year==2020 & Site=="TB" & npp_type=="ANPP")
-                          , random = ~1 |Block/Paddock/Plot
+                          , random = ~1 |Block/Paddock
                           , na.action = na.omit)
   anova.lme(tb_anpp_2020_lme, type="marginal")
   performance::r2(tb_anpp_2020_lme) # Marginal R2 considers only the variance of the fixed effects, which is what I want
