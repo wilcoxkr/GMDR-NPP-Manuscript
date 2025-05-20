@@ -12,6 +12,7 @@ library(performance)
 library(ggthemes)
 library(broom)
 library(sjstats)
+library(sjPlot)
 library(emmeans)
 rm(list=ls()) # clean up
 
@@ -22,7 +23,9 @@ setwd("C:\\Users\\K_WILCOX\\OneDrive - UNCG\\Current projects\\GMDR\\data\\anpp\
 setwd("C:\\Users\\wilco\\OneDrive - UNCG\\Current projects\\GMDR\\data\\anpp\\") # Kevins office computer UNCG
 
 # Set writing directory
-write_dir <- "C:\\Users\\K_WILCOX\\OneDrive - UNCG\\Current projects\\GMDR\\npp_manuscript\\"
+figure_dir <- "C:\\Users\\K_WILCOX\\OneDrive - UNCG\\Current projects\\GMDR\\npp_manuscript\\figures\\"
+table_dir <- "C:\\Users\\K_WILCOX\\OneDrive - UNCG\\Current projects\\GMDR\\npp_manuscript\\tables\\"
+df_dir <- "C:\\Users\\K_WILCOX\\OneDrive - UNCG\\Current projects\\GMDR\\npp_manuscript\\data_sets\\"
 
 ### Set graphing parameters
 # source("C:\\Users\\wilco\\OneDrive - University of Wyoming\\Cross_workstation_workspace\\Git projects\\Grazing-Management-for-Drought-Resilience\\graph_format.R")
@@ -52,7 +55,7 @@ Plot_Key <- read.csv("..\\Plot_Treatment_Key_020424.csv") %>%
   dplyr::select(-drought) %>%
   rename(Drought=rainfall_reduction, Block=block, Paddock=paddock, Grazing=grazing_category)
 
-### Read in cleaning script (check line numbers haven't changed in initial script)
+### Read in ANPP cleaning script(has to have appropriate tags surrounding section to be sourced)
 sourcePartial <- function(fn,startTag='#from here',endTag='#to here') {
   lines <- scan(fn, what=character(), sep="\n", quiet=TRUE)
   st<-grep(startTag,lines)
@@ -65,23 +68,377 @@ sourcePartial <- function(fn,startTag='#from here',endTag='#to here') {
 sourcePartial("C:\\Users\\k_wilcox\\OneDrive - UNCG\\Git projects\\Grazing-Management-for-Drought-Resilience\\GMDR-NPP-Manuscript\\03_anpp_bnpp plotting and analysis.R"
               , startTag='#BEGIN_ANPP_SOURCE', endTag='#END_ANPP_SOURCE')
 
+rm(anpp_fk_18_23, anpp_tb_18, anpp_tb_18_21, anpp_tb_18_22, anpp_tb_18_23, anpp_tb_19_23, anpp_tb_22)
 
 ###
-### ANPP by functional groups - models and plotting
+### Combine data into one df and write cleaned data to file
+###
+
+anpp_fxn_grps <- anpp_fk_plot_means %>%
+  dplyr::select(-dead, -litter, -subshrub_shrub, -ANPP_gm2) %>%
+  pivot_longer(cols=C4P_gm2:Forb_gm2,names_to="fxn_type") %>%
+  bind_rows(
+    anpp_tb_plot_means %>%
+      dplyr::select(-StandingDead_gm2, -Vulpia_gm2, -Bromus_gm2, -ANPP_gm2) %>%
+      pivot_longer(cols=C3P_gm2:AnnualGrass_gm2,names_to="fxn_type")
+  ) %>%
+  rename(ANPP_gm2=value)
+
+with(anpp_fxn_grps, table(Year, Site, Drought))
+with(anpp_fxn_grps, table(fxn_type, Year, Site, Block, Paddock)) ## Looks good
+
+## take a look at the data
+ggplot(filter(anpp_fxn_grps, fxn_type=="C4P_gm2"), aes(x=Drought, y=ANPP_gm2)) + geom_jitter(width=2) + geom_smooth(method="lm",se=F) + facet_grid(Site~Year)
+ggplot(filter(anpp_fxn_grps, fxn_type=="C3P_gm2"), aes(x=Drought, y=ANPP_gm2)) + geom_jitter(width=2) + geom_smooth(method="lm",se=F) + facet_grid(Site~Year)
+ggplot(filter(anpp_fxn_grps, fxn_type=="Forb_gm2"), aes(x=Drought, y=ANPP_gm2)) + geom_jitter(width=2) + geom_smooth(method="lm",se=F) + facet_grid(Site~Year)
+ggplot(filter(anpp_fxn_grps, fxn_type=="AnnualGrass_gm2"), aes(x=Drought, y=ANPP_gm2)) + geom_jitter(width=2) + geom_smooth(method="lm",se=F) + facet_grid(Site~Year)
+
+write.csv(anpp_fxn_grps, file=paste0(df_dir, "ANPP by fxn group_2018-2023_", Sys.Date(), ".csv"), row.names=F)  
+
+
+###
+### Running models -- raw ANPP by functional groups
 ###
 {
-  anpp_fxn_grps <- anpp_fk_plot_means %>%
-    dplyr::select(-dead, -litter, -subshrub_shrub, -ANPP_gm2) %>%
-    pivot_longer(cols=C4P_gm2:Forb_gm2,names_to="fxn_type") %>%
-    bind_rows(
-      anpp_tb_plot_means %>%
-        dplyr::select(-StandingDead_gm2, -Vulpia_gm2, -Bromus_gm2, -ANPP_gm2) %>%
-        pivot_longer(cols=C3P_gm2:AnnualGrass_gm2,names_to="fxn_type")
-    ) %>%
-    rename(ANPP_gm2=value)
+
+  ### Fort Keogh
+  ###
   
-  ## Running models for different functional groups (NEED TO PUT THESE IN A TABLE)
-  # Thunder basin overall models
+  ## C3p
+  ##
+  fk_c3p_model_full <- lme(log(ANPP_gm2+0.1) ~ as.factor(Year)*Drought+as.factor(Year)*Grazing+Drought*Grazing
+                            , data=filter(anpp_fxn_grps, Year %in% 2019:2023 & Site=="FK" & fxn_type=="C3P_gm2")
+                            , random = ~1 |Block/Paddock/Plot
+                            , correlation=corAR1(form = ~1 |Block/Paddock/Plot)
+                            , control=lmeControl(returnObject=TRUE)
+                            , na.action = na.omit)
+  fk_c3p_anova <- anova.lme(fk_c3p_model_full, type="marginal")
+  plot(fk_c3p_model_full, type=c("p","smooth"), col.line=1)
+  qqnorm(fk_c3p_model_full, abline = c(0,1)) ## qqplot
+  hist(filter(anpp_fxn_grps, Year %in% 2019:2023 & Site=="FK" & fxn_type=="C3P_gm2")$ANPP_gm2)
+  
+  emtrends(fk_c3p_model_full, "Year", var="Drought")
+  test(emtrends(fk_c3p_model_full, "Year", var="Drought"))
+  # emmeans(fk_anpp_model_full, "Grazing", by="Year")
+  # pairs(emmeans(fk_anpp_model_full, "Grazing", by="Year")) ## Nothing comes out in the multiple comparison
+  
+  # Save to writable tables
+  fk_c3p_anova_df <- data.frame(effect=row.names(fk_c3p_anova), fk_c3p_anova, fxn_type="C3P", site="FK")
+  fk_c3p_emtrends <- data.frame(test(emtrends(fk_c3p_model_full, "Year", var="Drought")), fxn_type="C3P", site="FK")
+  
+  ### Split by year to get R2 values for significant regressions 
+  # 2019
+  fk_c3p_2019_lme <- lme(log(ANPP_gm2+0.1) ~ Drought
+                          , data=filter(anpp_fxn_grps, Year==2019 & Site=="FK" & fxn_type=="C3P_gm2")
+                          , random = ~1 |Block/Paddock
+                          , na.action = na.omit)
+  anova.lme(fk_c3p_2019_lme, type="marginal")
+  performance::r2(fk_c3p_2019_lme) # CAN'T HAVE PLOT IN RANDOM STATEMENT - Marginal R2 considers only the variance of the fixed effects, which is what I want
+  
+  # 2020
+  fk_c3p_2020_lme <- lme(log(ANPP_gm2+0.1) ~ Drought
+                         , data=filter(anpp_fxn_grps, Year==2020 & Site=="FK" & fxn_type=="C3P_gm2")
+                         , random = ~1 |Block/Paddock
+                         , na.action = na.omit)
+  anova.lme(fk_c3p_2020_lme, type="marginal")
+  performance::r2(fk_c3p_2020_lme) # CAN'T HAVE PLOT IN RANDOM STATEMENT.. Marginal R2 considers only the variance of the fixed effects, which is what I want
+  
+  # 2021
+  fk_c3p_2021_lme <- lme(log(ANPP_gm2+0.1) ~ Drought
+                         , data=filter(anpp_fxn_grps, Year==2021 & Site=="FK" & fxn_type=="C3P_gm2")
+                         , random = ~1 |Block/Paddock
+                         , na.action = na.omit)
+  anova.lme(fk_c3p_2021_lme, type="marginal")
+  performance::r2(fk_c3p_2021_lme) # CAN'T HAVE PLOT IN RANDOM STATEMENT Marginal R2 considers only the variance of the fixed effects, which is what I want
+  # 2022
+  fk_c3p_2022_lme <- lme(log(ANPP_gm2+0.1) ~ Drought
+                         , data=filter(anpp_fxn_grps, Year==2022 & Site=="FK" & fxn_type=="C3P_gm2")
+                         , random = ~1 |Block/Paddock
+                         , na.action = na.omit)
+  anova.lme(fk_c3p_2022_lme, type="marginal")
+  performance::r2(fk_c3p_2022_lme) # CAN'T HAVE PLOT IN RANDOM STATEMENT .. Marginal R2 considers only the variance of the fixed effects, which is what I want
+  # 2023
+  fk_c3p_2023_lme <- lme(log(ANPP_gm2+0.1) ~ Drought
+                         , data=filter(anpp_fxn_grps, Year==2023 & Site=="FK" & fxn_type=="C3P_gm2")
+                         , random = ~1 |Block/Paddock
+                         , na.action = na.omit)
+  anova.lme(fk_c3p_2023_lme, type="marginal")
+  performance::r2(fk_c3p_2023_lme) # CAN'T HAVE PLOT IN RANDOM STATEMENT .. Marginal R2 considers only the variance of the fixed effects, which is what I want
+  
+  ## C4p
+  ##
+  fk_c4p_model_full <- lme(log(ANPP_gm2+.1) ~ as.factor(Year)*Drought+as.factor(Year)*Grazing+Drought*Grazing
+                           , data=filter(anpp_fxn_grps, Year %in% 2019:2023 & Site=="FK" & fxn_type=="C4P_gm2")
+                           , random = ~1 |Block/Paddock/Plot
+                           , correlation=corAR1(form = ~1 |Block/Paddock/Plot)
+                           , control=lmeControl(returnObject=TRUE)
+                           , na.action = na.omit)
+  fk_c4p_anova <- anova.lme(fk_c4p_model_full, type="marginal")
+  plot(fk_c4p_model_full, type=c("p","smooth"), col.line=1)
+  qqnorm(fk_c4p_model_full, abline = c(0,1)) ## qqplot
+  hist(log(filter(anpp_fxn_grps, Year %in% 2019:2023 & Site=="FK" & fxn_type=="C4P_gm2")$ANPP_gm2+.1))
+  
+  emtrends(fk_c4p_model_full, "Year", var="Drought")
+  test(emtrends(fk_c4p_model_full, "Year", var="Drought"))
+  # emmeans(fk_anpp_model_full, "Grazing", by="Year")
+  # pairs(emmeans(fk_anpp_model_full, "Grazing", by="Year")) ## Nothing comes out in the multiple comparison
+  
+  # Save to writable tables
+  fk_c4p_anova_df <- data.frame(effect=row.names(fk_c4p_anova), fk_c4p_anova, fxn_type="C4P", site="FK")
+  fk_c4p_emtrends <- data.frame(test(emtrends(fk_c4p_model_full, "Year", var="Drought")), fxn_type="C4P", site="FK")
+  
+  # 2019
+  fk_c4p_2019_lme <- lme(log(ANPP_gm2+.1) ~ Drought
+                         , data=filter(anpp_fxn_grps, Year==2019 & Site=="FK" & fxn_type=="C4P_gm2")
+                         , random = ~1 |Block/Paddock
+                         , na.action = na.omit)
+  anova.lme(fk_c4p_2019_lme, type="marginal")
+  performance::r2(fk_c4p_2019_lme) # CAN'T HAVE PLOT IN RANDOM EFFECT .. Marginal R2 considers only the variance of the fixed effects, which is what I want
+  
+  # 2020 (not significant)
+
+  # 2021
+  fk_c4p_2021_lme <- lme(log(ANPP_gm2+.1) ~ Drought
+                         , data=filter(anpp_fxn_grps, Year==2021 & Site=="FK" & fxn_type=="C4P_gm2")
+                         , random = ~1 |Block/Paddock
+                         , na.action = na.omit)
+  anova.lme(fk_c4p_2021_lme, type="marginal")
+  performance::r2(fk_c4p_2021_lme) # 0.94 R2 DOESN'T SEEM CORRECT .. Marginal R2 considers only the variance of the fixed effects, which is what I want
+  # 2022
+  fk_c4p_2022_lme <- lme(log(ANPP_gm2+.1) ~ Drought
+                         , data=filter(anpp_fxn_grps, Year==2022 & Site=="FK" & fxn_type=="C4P_gm2")
+                         , random = ~1 |Block/Paddock
+                         , na.action = na.omit)
+  anova.lme(fk_c4p_2022_lme, type="marginal")
+  performance::r2(fk_c4p_2022_lme) # 0.58 R2 DOESN'T SEEM CORRECT .. Marginal R2 considers only the variance of the fixed effects, which is what I want
+  # 2023
+  fk_c4p_2023_lme <- lme(log(ANPP_gm2+.1) ~ Drought
+                         , data=filter(anpp_fxn_grps, Year==2023 & Site=="FK" & fxn_type=="C4P_gm2")
+                         , random = ~1 |Block/Paddock
+                         , na.action = na.omit)
+  anova.lme(fk_c4p_2023_lme, type="marginal")
+  performance::r2(fk_c4p_2023_lme) # 0.75 R2 DOESN'T SEEM CORRECT .. Marginal R2 considers only the variance of the fixed effects, which is what I want
+  
+  ## Forb
+  ##
+  fk_forb_model_full <- lme(log(ANPP_gm2+.1) ~ as.factor(Year)*Drought+as.factor(Year)*Grazing+Drought*Grazing
+                           , data=filter(anpp_fxn_grps, Year %in% 2019:2023 & Site=="FK" & fxn_type=="Forb_gm2")
+                           , random = ~1 |Block/Paddock/Plot
+                           , correlation=corAR1(form = ~1 |Block/Paddock/Plot)
+                           , control=lmeControl(returnObject=TRUE)
+                           , na.action = na.omit)
+  fk_forb_anova <- anova.lme(fk_forb_model_full, type="marginal")
+  plot(fk_forb_model_full, type=c("p","smooth"), col.line=1)
+  qqnorm(fk_forb_model_full, abline = c(0,1)) ## qqplot
+  hist(log(filter(anpp_fxn_grps, Year %in% 2019:2023 & Site=="FK" & fxn_type=="Forb_gm2")$ANPP_gm2+.1))
+  
+  emtrends(fk_forb_model_full, "Year", var="Drought")
+  test(emtrends(fk_forb_model_full, "Year", var="Drought"))
+  # emmeans(fk_anpp_model_full, "Grazing", by="Year")
+  # pairs(emmeans(fk_anpp_model_full, "Grazing", by="Year")) ## Nothing comes out in the multiple comparison
+#  ggplot(filter(anpp_fxn_grps, Year %in% 2019:2023 & Site=="FK" & fxn_type=="Forb_gm2"), aes(x=Drought, y=ANPP_gm2, col=Grazing)) +geom_point()+geom_smooth(method="lm",se=F)+facet_grid(Site~Year)
+
+  # Save to writable tables
+  fk_forb_anova_df <- data.frame(effect=row.names(fk_forb_anova), fk_forb_anova,fxn_type="Forb",  site="FK")
+  fk_forb_emtrends <- data.frame(test(emtrends(fk_forb_model_full, "Year", var="Drought")), fxn_type="Forb", site="FK")
+  
+  # 2019
+  fk_forb_2019_lme <- lme(log(ANPP_gm2+.1) ~ Drought
+                         , data=filter(anpp_fxn_grps, Year==2019 & Site=="FK" & fxn_type=="Forb_gm2")
+                         , random = ~1 |Block/Paddock
+                         , na.action = na.omit)
+  anova.lme(fk_forb_2019_lme, type="marginal")
+  performance::r2(fk_forb_2019_lme) # CAN'T HAVE PLOT IN RANDOM STATEMENT - Marginal R2 considers only the variance of the fixed effects, which is what I want
+  
+  # 2020
+  fk_forb_2020_lme <- lme(log(ANPP_gm2+.1) ~ Drought
+                         , data=filter(anpp_fxn_grps, Year==2020 & Site=="FK" & fxn_type=="Forb_gm2")
+                         , random = ~1 |Block/Paddock
+                         , na.action = na.omit)
+  anova.lme(fk_forb_2020_lme, type="marginal")
+  performance::r2(fk_forb_2020_lme) # CAN'T HAVE PLOT IN RANDOM STATEMENT.. Marginal R2 considers only the variance of the fixed effects, which is what I want
+  
+  
+  ## AnnualGrass
+  ##
+  fk_annualgrass_model_full <- lme(log(ANPP_gm2+.1) ~ as.factor(Year)*Drought+as.factor(Year)*Grazing+Drought*Grazing
+                            , data=filter(anpp_fxn_grps, Year %in% 2019:2023 & Site=="FK" & fxn_type=="AnnualGrass_gm2")
+                            , random = ~1 |Block/Paddock/Plot
+                            , correlation=corAR1(form = ~1 |Block/Paddock/Plot)
+                            , control=lmeControl(returnObject=TRUE)
+                            , na.action = na.omit)
+  fk_annualgrass_anova <- anova.lme(fk_annualgrass_model_full, type="marginal")
+  plot(fk_annualgrass_model_full, type=c("p","smooth"), col.line=1)
+  qqnorm(fk_annualgrass_model_full, abline = c(0,1)) ## qqplot
+  hist(log(filter(anpp_fxn_grps, Year %in% 2019:2023 & Site=="FK" & fxn_type=="AnnualGrass_gm2")$ANPP_gm2+.1))
+  
+  emtrends(fk_annualgrass_model_full, "Year", var="Drought")
+  test(emtrends(fk_annualgrass_model_full, "Year", var="Drought"))
+  # emmeans(fk_anpp_model_full, "Grazing", by="Year")
+  # pairs(emmeans(fk_anpp_model_full, "Grazing", by="Year")) ## Nothing comes out in the multiple comparison
+  #  ggplot(filter(anpp_fxn_grps, Year %in% 2019:2023 & Site=="FK" & fxn_type=="AnnualGrass_gm2"), aes(x=Drought, y=ANPP_gm2, col=Grazing)) +geom_point()+geom_smooth(method="lm",se=F)+facet_grid(Site~Year)
+  
+  # Save to writable tables
+  fk_annualgrass_anova_df <- data.frame(effect=row.names(fk_annualgrass_anova), fk_annualgrass_anova, fxn_type="AnnualGrass", site="FK")
+  fk_annualgrass_emtrends <- data.frame(test(emtrends(fk_annualgrass_model_full, "Year", var="Drought")), fxn_type="AnnualGrass", site="FK")
+  
+  # 2022
+  fk_annualgrass_2022_lme <- lme(log(ANPP_gm2+0.1) ~ Drought
+                          , data=filter(anpp_fxn_grps, Year==2022 & Site=="FK" & fxn_type=="AnnualGrass_gm2")
+                          , random = ~1 |Block/Paddock
+                          , na.action = na.omit)
+  anova.lme(fk_annualgrass_2022_lme, type="marginal")
+  performance::r2(fk_annualgrass_2022_lme) # CAN'T HAVE PLOT IN RANDOM STATEMENT - Marginal R2 considers only the variance of the fixed effects, which is what I want
+  
+  # 2023
+  fk_annualgrass_2023_lme <- lme(log(ANPP_gm2+0.1) ~ Drought
+                          , data=filter(anpp_fxn_grps, Year==2023 & Site=="FK" & fxn_type=="AnnualGrass_gm2")
+                          , random = ~1 |Block/Paddock
+                          , na.action = na.omit)
+  anova.lme(fk_annualgrass_2023_lme, type="marginal")
+  performance::r2(fk_annualgrass_2023_lme) # CAN'T HAVE PLOT IN RANDOM STATEMENT.. Marginal R2 considers only the variance of the fixed effects, which is what I want
+  
+  
+  ### Thunder Basin
+  ###
+  
+  ## C3p
+  ##
+  tb_c3p_model_full <- lme(log(ANPP_gm2+.1) ~ as.factor(Year)*Drought+as.factor(Year)*Grazing+Drought*Grazing
+                           , data=filter(anpp_fxn_grps, Year %in% 2019:2023 & Site=="TB" & fxn_type=="C3P_gm2")
+                           , random = ~1 |Block/Paddock/Plot
+                           , correlation=corAR1(form = ~1 |Block/Paddock/Plot)
+                           , control=lmeControl(returnObject=TRUE)
+                           , na.action = na.omit)
+  tb_c3p_anova <- anova.lme(tb_c3p_model_full, type="marginal")
+  plot(tb_c3p_model_full, type=c("p","smooth"), col.line=1)
+  qqnorm(tb_c3p_model_full, abline = c(0,1)) ## qqplot
+  hist(log(filter(anpp_fxn_grps, Year %in% 2019:2023 & Site=="TB" & fxn_type=="C3P_gm2")$ANPP_gm2+0.1))
+  
+  emtrends(tb_c3p_model_full, "Year", var="Drought")
+  test(emtrends(tb_c3p_model_full, "Year", var="Drought"))
+  emmeans(tb_c3p_model_full, "Grazing", by="Year")
+  pairs(emmeans(tb_c3p_model_full, "Grazing", by="Year")) ## Just a higher c3p in MMMMM than MLLMM in 2023... probably spurious
+  
+  # Save to writable tables
+  tb_c3p_anova_df <- data.frame(effect=row.names(tb_c3p_anova), tb_c3p_anova, fxn_type="C3P", site="TB")
+  tb_c3p_emtrends <- data.frame(test(emtrends(tb_c3p_model_full, "Year", var="Drought")), fxn_type="C3P", site="TB")
+  
+  ### Split by year to get R2 values for significant regressions 
+  # 2021 (only significant year from emtrends output)
+  tb_c3p_2021_lme <- lme(log(ANPP_gm2+0.1) ~ Drought
+                         , data=filter(anpp_fxn_grps, Year==2021 & Site=="TB" & fxn_type=="C3P_gm2")
+                         , random = ~1 |Block/Paddock
+                         , na.action = na.omit)
+  anova.lme(tb_c3p_2021_lme, type="marginal")
+  performance::r2(tb_c3p_2021_lme) # CAN'T HAVE PLOT IN RANDOM STATEMENT Marginal R2 considers only the variance of the fixed effects, which is what I want
+
+  ## C4p
+  ##
+  tb_c4p_model_full <- lme(log(ANPP_gm2+.1) ~ as.factor(Year)*Drought+as.factor(Year)*Grazing+Drought*Grazing
+                           , data=filter(anpp_fxn_grps, Year %in% 2019:2023 & Site=="TB" & fxn_type=="C4P_gm2")
+                           , random = ~1 |Block/Paddock/Plot
+                           , correlation=corAR1(form = ~1 |Block/Paddock/Plot)
+                           , control=lmeControl(returnObject=TRUE)
+                           , na.action = na.omit)
+  tb_c4p_anova <- anova.lme(tb_c4p_model_full, type="marginal")
+  plot(tb_c4p_model_full, type=c("p","smooth"), col.line=1)
+  qqnorm(tb_c4p_model_full, abline = c(0,1)) ## qqplot
+  hist(log(filter(anpp_fxn_grps, Year %in% 2019:2023 & Site=="TB" & fxn_type=="C4P_gm2")$ANPP_gm2+.1))
+  
+  # no significant interactions
+    # emtrends(tb_c4p_model_full, "Year", var="Drought")
+  # test(emtrends(tb_c4p_model_full, "Year", var="Drought"))
+  # emmeans(tb_anpp_model_full, "Grazing", by="Year")
+  # pairs(emmeans(tb_anpp_model_full, "Grazing", by="Year")) ## Nothing comes out in the multiple comparison
+  
+  # Save to writable tables
+  tb_c4p_anova_df <- data.frame(effect=row.names(tb_c4p_anova), tb_c4p_anova, fxn_type="C4P", site="TB")
+#  tb_c4p_emtrends <- data.frame(test(emtrends(tb_c4p_model_full, "Year", var="Drought")), fxn_type="C4P", site="TB")
+  
+
+  ## Forb
+  ##
+  tb_forb_model_full <- lme(log(ANPP_gm2+.1) ~ as.factor(Year)*Drought+as.factor(Year)*Grazing+Drought*Grazing
+                            , data=filter(anpp_fxn_grps, Year %in% 2019:2023 & Site=="TB" & fxn_type=="Forb_gm2")
+                            , random = ~1 |Block/Paddock/Plot
+                            , correlation=corAR1(form = ~1 |Block/Paddock/Plot)
+                            , control=lmeControl(returnObject=TRUE)
+                            , na.action = na.omit)
+  tb_forb_anova <- anova.lme(tb_forb_model_full, type="marginal")
+  plot(tb_forb_model_full, type=c("p","smooth"), col.line=1)
+  qqnorm(tb_forb_model_full, abline = c(0,1)) ## qqplot
+  hist(log(filter(anpp_fxn_grps, Year %in% 2019:2023 & Site=="TB" & fxn_type=="Forb_gm2")$ANPP_gm2+.1))
+  
+  # NO SIGNIFICANT INTERACTIONS SO STOP HERE
+    # emtrends(tb_forb_model_full, "Year", var="Drought")
+  # test(emtrends(tb_forb_model_full, "Year", var="Drought"))
+  # # emmeans(tb_anpp_model_full, "Grazing", by="Year")
+  # pairs(emmeans(tb_anpp_model_full, "Grazing", by="Year")) ## Nothing comes out in the multiple comparison
+  #  ggplot(filter(anpp_fxn_grps, Year %in% 2019:2023 & Site=="TB" & fxn_type=="Forb_gm2"), aes(x=Drought, y=ANPP_gm2, col=Grazing)) +geom_point()+geom_smooth(method="lm",se=F)+facet_grid(Site~Year)
+  
+  # Save to writable tables
+  tb_forb_anova_df <- data.frame(effect=row.names(tb_forb_anova), tb_forb_anova,fxn_type="Forb",  site="TB")
+ # tb_forb_emtrends <- data.frame(test(emtrends(tb_forb_model_full, "Year", var="Drought")), fxn_type="Forb", site="TB")
+  
+
+  ## AnnualGrass
+  ##
+  tb_annualgrass_model_full <- lme(log(ANPP_gm2+.1) ~ as.factor(Year)*Drought+as.factor(Year)*Grazing+Drought*Grazing
+                                   , data=filter(anpp_fxn_grps, Year %in% 2019:2023 & Site=="TB" & fxn_type=="AnnualGrass_gm2")
+                                   , random = ~1 |Block/Paddock/Plot
+                                   , correlation=corAR1(form = ~1 |Block/Paddock/Plot)
+                                   , control=lmeControl(returnObject=TRUE)
+                                   , na.action = na.omit)
+  tb_annualgrass_anova <- anova.lme(tb_annualgrass_model_full, type="marginal")
+  plot(tb_annualgrass_model_full, type=c("p","smooth"), col.line=1)
+  qqnorm(tb_annualgrass_model_full, abline = c(0,1)) ## qqplot
+  hist(log(filter(anpp_fxn_grps, Year %in% 2019:2023 & Site=="TB" & fxn_type=="AnnualGrass_gm2")$ANPP_gm2+.1))
+  
+  emtrends(tb_annualgrass_model_full, "Year", var="Drought")
+  test(emtrends(tb_annualgrass_model_full, "Year", var="Drought"))
+  # emmeans(tb_anpp_model_full, "Grazing", by="Year")
+  # pairs(emmeans(tb_anpp_model_full, "Grazing", by="Year")) ## Nothing comes out in the multiple comparison
+  #  ggplot(filter(anpp_fxn_grps, Year %in% 2019:2023 & Site=="TB" & fxn_type=="AnnualGrass_gm2"), aes(x=Drought, y=ANPP_gm2, col=Grazing)) +geom_point()+geom_smooth(method="lm",se=F)+facet_grid(Site~Year)
+  
+  # Save to writable tables
+  tb_annualgrass_anova_df <- data.frame(effect=row.names(tb_annualgrass_anova), tb_annualgrass_anova, fxn_type="AnnualGrass", site="TB")
+  tb_annualgrass_emtrends <- data.frame(test(emtrends(tb_annualgrass_model_full, "Year", var="Drought")), fxn_type="AnnualGrass", site="TB")
+  
+  # 2021 (Only significant drought effect in this year from emtrends output)
+  tb_annualgrass_2021_lme <- lme(log(ANPP_gm2+0.1) ~ Drought
+                                 , data=filter(anpp_fxn_grps, Year==2021 & Site=="TB" & fxn_type=="AnnualGrass_gm2")
+                                 , random = ~1 |Block/Paddock
+                                 , na.action = na.omit)
+  anova.lme(tb_annualgrass_2021_lme, type="marginal")
+  performance::r2(tb_annualgrass_2021_lme) # CAN'T HAVE PLOT IN RANDOM STATEMENT - Marginal R2 considers only the variance of the fixed effects, which is what I want
+  
+  
+  ### Write tables of model output
+  anova_raw_fxn_df <- fk_c3p_anova_df %>% 
+    bind_rows(fk_c4p_anova_df,
+              fk_forb_anova_df,
+              fk_annualgrass_anova_df,
+              tb_c3p_anova_df,
+              tb_c4p_anova_df,
+              tb_forb_anova_df,
+              tb_annualgrass_anova_df)
+  emtrends_raw_fxn_df <- fk_c3p_emtrends %>% 
+    bind_rows(fk_c4p_emtrends,
+              fk_forb_emtrends,
+              fk_annualgrass_emtrends,
+              tb_c3p_emtrends,
+         #     tb_c4p_emtrends, ##no significant interaction in main model
+        #      tb_forb_emtrends,##no significant interaction in main model
+              tb_annualgrass_emtrends)
+  
+  write.csv(anova_raw_fxn_df, file=paste0(table_dir,"fxn groups anpp lme ANCOVA output_both sites_2019-2023",Sys.Date(),".csv"), row.names=F)
+  write.csv(emtrends_raw_fxn_df, file=paste0(table_dir,"fxn groups anpp emtrends_both sites_2019-2023",Sys.Date(),".csv"), row.names=F)
+  
+  
+  
+  
+  
   
   fxn_vec <- unique(anpp_fxn_grps$fxn_type)
   
@@ -295,6 +652,39 @@ sourcePartial("C:\\Users\\k_wilcox\\OneDrive - UNCG\\Git projects\\Grazing-Manag
   print(fxn_diff_plot)
   dev.off()
 }
+
+### Plots of different functional groups
+ggplot(anpp_tb_drt_means, aes(x=Drought, y=C3P_mean, ymin=C3P_mean-C3P_se, ymax=C3P_mean+C3P_se)) +
+  geom_errorbar(width=1) +
+  geom_point() +
+  geom_smooth(method="lm",se=F) +
+  facet_grid(cols=vars(Year), scales="free") +
+  xlim(0,100) + ylab("C3 Grass (g/m2)")
+ggsave("..\\..\\figures\\ANPP\\tb_C3Grass_18-22.png", width=9, height=3, units="in")
+
+ggplot(anpp_tb_drt_means, aes(x=Drought, y=C4P_mean, ymin=C4P_mean-C4P_se, ymax=C4P_mean+C4P_se)) +
+  geom_errorbar(width=1) +
+  geom_point() +
+  geom_smooth(method="lm",se=F) +
+  facet_grid(cols=vars(Year), scales="free") +
+  xlim(0,100) + ylab("C4 Grass (g/m2)")
+ggsave("..\\..\\figures\\ANPP\\tb_c4Grass_18-22.png", width=9, height=3, units="in")
+
+ggplot(anpp_tb_drt_means, aes(x=Drought, y=Forb_mean, ymin=Forb_mean-Forb_se, ymax=Forb_mean+Forb_se)) +
+  geom_errorbar(width=1) +
+  geom_point() +
+  geom_smooth(method="lm",se=F) +
+  facet_grid(cols=vars(Year), scales="free") +
+  xlim(0,100) + ylab("Forbs (g/m2)")
+ggsave("..\\..\\figures\\ANPP\\tb_Forb_18-22.png", width=9, height=3, units="in")
+
+ggplot(anpp_tb_drt_means, aes(x=Drought, y=AnnualGrass_mean, ymin=AnnualGrass_mean-AnnualGrass_se, ymax=AnnualGrass_mean+AnnualGrass_se)) +
+  geom_errorbar(width=1) +
+  geom_point() +
+  geom_smooth(method="lm",se=F) +
+  facet_grid(cols=vars(Year), scales="free") +
+  xlim(0,100) + ylab("Annual Grass (g/m2)")
+ggsave("..\\..\\figures\\ANPP\\tb_annualGrass_18-22.png", width=9, height=3, units="in")
 
 # response ratio
 ggplot(filter(anpp_rr_fxn_means,Year!=2018), aes(x=Drought, y=lnrr_anpp_mean, ymin=lnrr_anpp_mean-lnrr_anpp_se, ymax=lnrr_anpp_mean+lnrr_anpp_se, col=fxn_type, fill=fxn_type, pch=fxn_type)) +
