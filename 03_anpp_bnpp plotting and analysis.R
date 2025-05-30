@@ -685,6 +685,65 @@ write.csv(npp_master, file=paste0(write_dir,"data_sets\\ANPP BNPP total NPP_plot
 }
 
 ###
+### Looking for interactions between grazing and drought during recovery years (and year 2 of drought)
+###
+{
+  # 2020
+  fk_anpp_2020_lme <- lme(lnrr_npp ~ Drought*Grazing
+                          , data=filter(npp_rr, Year==2020 & Site=="FK" & npp_type=="ANPP")
+                          , random = ~1 |Block/Paddock
+                          , na.action = na.omit)
+  anova.lme(fk_anpp_2020_lme, type="marginal") # no grazing * Drought interaction
+  # 2021
+  fk_anpp_2021_lme <- lme(lnrr_npp ~ Drought*Grazing
+                          , data=filter(npp_rr, Year==2021 & Site=="FK" & npp_type=="ANPP")
+                          , random = ~1 |Block/Paddock
+                          , na.action = na.omit)
+  anova.lme(fk_anpp_2021_lme, type="marginal") # no grazing * Drought interaction
+
+  # 2022
+  fk_anpp_2022_lme <- lme(lnrr_npp ~ Drought*Grazing
+                          , data=filter(npp_rr, Year==2022 & Site=="FK" & npp_type=="ANPP")
+                          , random = ~1 |Block/Paddock
+                          , na.action = na.omit)
+  anova.lme(fk_anpp_2022_lme, type="marginal")# no grazing * Drought interaction
+  # 2023
+  fk_anpp_2023_lme <- lme(lnrr_npp ~ Drought*Grazing
+                          , data=filter(npp_rr, Year==2023 & Site=="FK" & npp_type=="ANPP")
+                          , random = ~1 |Block/Paddock
+                          , na.action = na.omit)
+  anova.lme(fk_anpp_2023_lme, type="marginal")# no grazing * Drought interaction
+
+  ## Thunder basin
+  # 2020
+  tb_anpp_2020_lme <- lme(lnrr_npp ~ Drought*Grazing
+                          , data=filter(npp_rr, Year==2020 & Site=="TB" & npp_type=="ANPP")
+                          , random = ~1 |Block/Paddock
+                          , na.action = na.omit)
+  anova.lme(tb_anpp_2020_lme, type="marginal") # no grazing * Drought interaction
+  # 2021
+  tb_anpp_2021_lme <- lme(lnrr_npp ~ Drought*Grazing
+                          , data=filter(npp_rr, Year==2021 & Site=="TB" & npp_type=="ANPP")
+                          , random = ~1 |Block/Paddock
+                          , na.action = na.omit)
+  anova.lme(tb_anpp_2021_lme, type="marginal") # no grazing * Drought interaction
+  
+  # 2022
+  tb_anpp_2022_lme <- lme(lnrr_npp ~ Drought*Grazing
+                          , data=filter(npp_rr, Year==2022 & Site=="TB" & npp_type=="ANPP")
+                          , random = ~1 |Block/Paddock
+                          , na.action = na.omit)
+  anova.lme(tb_anpp_2022_lme, type="marginal")# no grazing * Drought interaction
+  # 2023
+  tb_anpp_2023_lme <- lme(lnrr_npp ~ Drought*Grazing
+                          , data=filter(npp_rr, Year==2023 & Site=="TB" & npp_type=="ANPP")
+                          , random = ~1 |Block/Paddock
+                          , na.action = na.omit)
+  anova.lme(tb_anpp_2023_lme, type="marginal")# no grazing * Drought interaction
+  
+}
+
+###
 ### Plotting ANPP and BNPP ln(RR) by drought
 ###
 {
