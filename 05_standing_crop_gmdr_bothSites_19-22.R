@@ -23,6 +23,10 @@ source("C:\\Users\\K_WILCOX\\OneDrive - UNCG\\Git projects\\Grazing-Management-f
 ### Read in Anova t3 function
 source("C:\\Users\\K_WILCOX\\OneDrive - UNCG\\Git projects\\Grazing-Management-for-Drought-Resilience\\lme_anova_type3_function.R")
 
+### Write directories
+table_dir <- "C:\\Users\\K_WILCOX\\OneDrive - UNCG\\Current projects\\GMDR\\npp_manuscript\\tables"
+figure_dir <- "C:\\Users\\K_WILCOX\\OneDrive - UNCG\\Current projects\\GMDR\\npp_manuscript\\figures"
+
 ### Create Standard Error function 
 SE_function<-function(x,na.rm=na.rm){
   SE=sd(x,na.rm=TRUE)/sqrt(length(x[!is.na(x)]))
@@ -206,7 +210,22 @@ ggplot(stcrop_rr, aes(Drought, lnrr_som, col=Grazing)) +
 
   # because of year*grazing interaction, look at grazing effect by year  
   emmeans(fk_live_root_rr_lme_full, pairwise ~ Grazing, by="year", adjust="sidak")
-
+  # also look at drought by year, for fun
+  test(emtrends(fk_live_root_rr_lme_full, "year", var="Drought"))
+  
+  ## Significant slope in 2021, so look at model for R2
+  fk_live_root_rr_lme_2021 <- lme(lnrr_live_root ~ Drought
+                                , data=filter(stcrop_rr, year == 2021 & site=="FK")
+                                , random = ~1 |block/Paddock
+                                , na.action = na.omit)
+  anova(fk_live_root_rr_lme_2021, type="marginal")
+  performance::r2(fk_live_root_rr_lme_2021)
+  
+  # Save to writable tables
+  fk_live_root_anova <- anova.lme(fk_live_root_rr_lme_full, type="marginal")
+  fk_live_root_anova_df <- data.frame(effect=row.names(fk_live_root_anova), fk_live_root_anova, biomass_type="live_root", site="FK")
+  fk_live_root_emtrends <- data.frame(test(emtrends(fk_live_root_rr_lme_full, "year", var="Drought")), biomass_type="live_root", site="FK")
+  
   ## Thunder Basin
   tb_live_root_rr_lme_full <- lme(lnrr_live_root ~ as.factor(year)*Drought + as.factor(year)*Grazing + Drought*Grazing
                                     , data=filter(stcrop_rr, year %in% 2019:2022 & site=="TB")
@@ -222,38 +241,21 @@ ggplot(stcrop_rr, aes(Drought, lnrr_som, col=Grazing)) +
   check_model(tb_live_root_rr_lme_full) ## residuals and normality of resids
 
   # because of year*drought interaction, look at drought regressions by year  
-
-  #2019
-  tb_live_root_rr_lme_2019 <- lme(lnrr_live_root ~ Drought*Grazing
-                               , data=filter(stcrop_rr, year == 2019 & site=="TB")
-                               , random = ~1 |block/Paddock/plot
-                               , na.action = na.omit)
-  anova.lme(tb_live_root_rr_lme_2019, type="marginal")
-  summary(tb_live_root_rr_lme_2019)
-  #2020
-  tb_live_root_rr_lme_2020 <- lme(lnrr_live_root ~ Drought*Grazing
-                               , data=filter(stcrop_rr, year == 2020 & site=="TB")
-                               , random = ~1 |block/Paddock/plot
-                               , na.action = na.omit)
-  anova.lme(tb_live_root_rr_lme_2020, type="marginal")
-  summary(tb_live_root_rr_lme_2020)
+  test(emtrends(tb_live_root_rr_lme_full, "year", var="Drought"))
+  
+  # split by year to get r2 (not using this since no drought effect is sig at alpha = .1)
   #2021
-  tb_live_root_rr_lme_2021 <- lme(lnrr_live_root ~ Drought*Grazing
+  tb_live_root_rr_lme_2021 <- lme(lnrr_live_root ~ Drought
                                , data=filter(stcrop_rr, year == 2021 & site=="TB")
-                               , random = ~1 |block/Paddock/plot
+                               , random = ~1 |block/Paddock
                                , na.action = na.omit)
   anova.lme(tb_live_root_rr_lme_2021, type="marginal")
-  summary(tb_live_root_rr_lme_2021)
-  #2022
-  tb_live_root_rr_lme_2022 <- lme(lnrr_live_root ~ Drought*Grazing
-                               , data=filter(stcrop_rr, year == 2022 & site=="TB")
-                               , random = ~1 |block/Paddock/plot
-                               , na.action = na.omit)
-  anova.lme(tb_live_root_rr_lme_2022, type="marginal")
-  summary(tb_live_root_rr_lme_2022)
+  performance::r2(tb_live_root_rr_lme_2021)
   
-  ### Nothing really here - weak pattern in 2021
-  
+  # Save to writable tables
+  tb_live_root_anova <- anova.lme(tb_live_root_rr_lme_full, type="marginal")
+  tb_live_root_anova_df <- data.frame(effect=row.names(tb_live_root_anova), tb_live_root_anova, biomass_type="live_root", site="TB")
+  tb_live_root_emtrends <- data.frame(test(emtrends(tb_live_root_rr_lme_full, "year", var="Drought")), biomass_type="live_root", site="TB")
   
   ##
   ## Dead roots and SOM
@@ -262,7 +264,6 @@ ggplot(stcrop_rr, aes(Drought, lnrr_som, col=Grazing)) +
   fk_som_rr_lme_full <- lme(lnrr_som ~ as.factor(year)*Drought + as.factor(year)*Grazing + Drought*Grazing
                                , data=filter(stcrop_rr, year %in% 2019:2022 & site=="FK")
                                , random = ~1 |block/Paddock/plot
-                               #                                    , correlation=corCompSymm(form = ~1 |block/Paddock/plot) # aic 264.2936
                                , correlation=corAR1(form = ~1 |block/Paddock/plot) # aic 261.87 -- going with AR1
                                , control=lmeControl(returnObject=TRUE)
                                , na.action = na.omit)
@@ -272,8 +273,29 @@ ggplot(stcrop_rr, aes(Drought, lnrr_som, col=Grazing)) +
   # check model assumptions -- meh...
   qqnorm(fk_som_rr_lme_full, abline = c(0,1)) ## qqplot
   check_model(fk_som_rr_lme_full) ## residuals and normality of resids
-
-  ## nothing significant, stop here
+  
+  # There isn't a sig drought by year interaction, but I'd like to look at the drought effects by year anyways
+  test(emtrends(fk_som_rr_lme_full, "year", var="Drought"))
+  
+  # 2019 model for r2
+  fk_som_rr_lme_2019 <- lme(lnrr_som ~ Drought
+                                  , data=filter(stcrop_rr, year == 2019 & site=="FK")
+                                  , random = ~1 |block/Paddock
+                                  , na.action = na.omit)
+  anova.lme(fk_som_rr_lme_2019, type="marginal")
+  performance::r2(fk_som_rr_lme_2019)
+  # 2019 model for r2
+  fk_som_rr_lme_2021 <- lme(lnrr_som ~ Drought
+                                  , data=filter(stcrop_rr, year == 2021 & site=="FK")
+                                  , random = ~1 |block/Paddock
+                                  , na.action = na.omit)
+  anova.lme(fk_som_rr_lme_2021, type="marginal")
+  performance::r2(fk_som_rr_lme_2021)
+  
+  # Save to writable tables
+  fk_som_anova <- anova.lme(fk_som_rr_lme_full, type="marginal")
+  fk_som_anova_df <- data.frame(effect=row.names(fk_som_anova), fk_som_anova, biomass_type="som", site="FK")
+  fk_som_emtrends <- data.frame(test(emtrends(fk_som_rr_lme_full, "year", var="Drought")), biomass_type="som", site="FK")
   
   ## Thunder Basin
   tb_som_rr_lme_full <- lme(lnrr_som ~ as.factor(year)*Drought + as.factor(year)*Grazing + Drought*Grazing
@@ -291,6 +313,36 @@ ggplot(stcrop_rr, aes(Drought, lnrr_som, col=Grazing)) +
   
   # because of year*grazing interaction, look at grazing effect by year  
   emmeans(tb_som_rr_lme_full, pairwise ~ Grazing, by="year", adjust="sidak")
+  # look at drought by year just because
+  test(emtrends(tb_som_rr_lme_full, "year", var="Drought"))
+  
+  # 2021 model for r2
+  tb_som_rr_lme_2021 <- lme(lnrr_som ~ Drought
+                            , data=filter(stcrop_rr, year == 2021 & site=="TB")
+                            , random = ~1 |block/Paddock
+                            , na.action = na.omit)
+  anova.lme(tb_som_rr_lme_2021, type="marginal")
+  performance::r2(tb_som_rr_lme_2021)
+  
+  # Save to writable tables
+  tb_som_anova <- anova.lme(tb_som_rr_lme_full, type="marginal")
+  tb_som_anova_df <- data.frame(effect=row.names(tb_som_anova), tb_som_anova, biomass_type="som", site="TB")
+  tb_som_emtrends <- data.frame(test(emtrends(tb_som_rr_lme_full, "year", var="Drought")), biomass_type="som", site="TB")
+ 
+  ###
+  ### Stitch model findings together and write to file
+  anova_root_df <- fk_live_root_anova_df %>% 
+    bind_rows(tb_live_root_anova_df,
+              fk_som_anova_df,
+              tb_som_anova_df
+              )
+  emtrends_root_df <- fk_live_root_emtrends %>% 
+    bind_rows(tb_live_root_emtrends,
+              fk_som_emtrends,
+              tb_som_emtrends
+    )
+  write.csv(anova_root_df, file=paste0(table_dir,"//live root and som RR lme ANCOVA output_both sites",Sys.Date(),".csv"), row.names=F)
+  write.csv(emtrends_root_df, file=paste0(table_dir,"//live root and som RR lme emtrends output_both sites",Sys.Date(),".csv"), row.names=F)
   
 }
   
@@ -304,24 +356,31 @@ ggplot(stcrop_rr, aes(Drought, lnrr_som, col=Grazing)) +
 ## Live roots
   
 ## Fort Keogh  
-fk_live_root_lme_full <- lme(live_root_biomass_gm2 ~ as.factor(year)*Drought + as.factor(year)*Grazing + Drought*Grazing
+fk_live_root_lme_full <- lme(log(live_root_biomass_gm2) ~ as.factor(year)*Drought + as.factor(year)*Grazing + Drought*Grazing
                              , data=filter(stcrop_all, year %in% 2019:2022 & site=="FK")
                              , random = ~1 |block/Paddock/plot
                              #                                    , correlation=corCompSymm(form = ~1 |block/Paddock/plot) # aic 264.2936
                              , correlation=corAR1(form = ~1 |block/Paddock/plot) # aic 261.87 -- going with AR1
                              , control=lmeControl(returnObject=TRUE)
                              , na.action = na.omit)
+
 anova.lme(fk_live_root_lme_full, type="marginal")
-summary(fk_live_root_lme_full)
-hist(filter(stcrop_all, year %in% 2019:2022 & site=="FK")$live_root_biomass_gm2)
+#summary(fk_live_root_lme_full)
+hist(log(filter(stcrop_all, year %in% 2019:2022 & site=="FK")$live_root_biomass_gm2))
 # check model
 qqnorm(fk_live_root_lme_full, abline = c(0,1)) ## qqplot
 check_model(fk_live_root_lme_full) ## residuals and normality of resids
 
-## Nothing significant except year so we'll stop here
+# have a look at drought slopes by year
+test(emtrends(fk_live_root_lme_full, "year", var="Drought"))
+
+# Save to writable tables
+fk_live_root_raw_anova <- anova.lme(fk_live_root_lme_full, type="marginal")
+fk_live_root_raw_anova_df <- data.frame(effect=row.names(fk_live_root_raw_anova), fk_live_root_raw_anova, biomass_type="live_root", site="FK")
+fk_live_root_raw_emtrends <- data.frame(test(emtrends(fk_live_root_lme_full, "year", var="Drought")), biomass_type="live_root", site="FK")
 
 ## Thunder Basin 
-tb_live_root_lme_full <- lme(live_root_biomass_gm2 ~ as.factor(year)*Drought + as.factor(year)*Grazing + Drought*Grazing
+tb_live_root_lme_full <- lme(log(live_root_biomass_gm2) ~ as.factor(year)*Drought + as.factor(year)*Grazing + Drought*Grazing
                              , data=filter(stcrop_all, year %in% 2019:2022 & site=="TB")
                              , random = ~1 |block/Paddock/plot
                              #                                    , correlation=corCompSymm(form = ~1 |block/Paddock/plot) # aic 264.2936
@@ -329,13 +388,18 @@ tb_live_root_lme_full <- lme(live_root_biomass_gm2 ~ as.factor(year)*Drought + a
                              , control=lmeControl(returnObject=TRUE)
                              , na.action = na.omit)
 anova.lme(tb_live_root_lme_full, type="marginal")
-summary(tb_live_root_lme_full)
-hist(filter(stcrop_all, year %in% 2019:2022 & site=="TB")$live_root_biomass_gm2)
+hist(log(filter(stcrop_all, year %in% 2019:2022 & site=="TB")$live_root_biomass_gm2))
 # check model
 qqnorm(tb_live_root_lme_full, abline = c(0,1)) ## qqplot
 check_model(tb_live_root_lme_full) ## residuals and normality of resids
 
-## Nothing significant so we'll stop here
+# have a look at drought slopes by year
+test(emtrends(tb_live_root_lme_full, "year", var="Drought"))
+
+# Save to writable tables
+tb_live_root_raw_anova <- anova.lme(tb_live_root_lme_full, type="marginal")
+tb_live_root_raw_anova_df <- data.frame(effect=row.names(tb_live_root_raw_anova), tb_live_root_raw_anova, biomass_type="live_root", site="TB")
+tb_live_root_raw_emtrends <- data.frame(test(emtrends(tb_live_root_lme_full, "year", var="Drought")), biomass_type="live_root", site="TB")
 
 ##
 ## Dead roots and SOM
@@ -349,7 +413,6 @@ fk_som_lme_full <- lme(som_biomass_gm2 ~ as.factor(year)*Drought + as.factor(yea
                              , control=lmeControl(returnObject=TRUE)
                              , na.action = na.omit)
 anova.lme(fk_som_lme_full, type="marginal")
-summary(fk_som_lme_full)
 hist(filter(stcrop_all, year %in% 2019:2022 & site=="FK")$som_biomass_gm2)
 
 # check model
@@ -357,33 +420,276 @@ qqnorm(fk_som_lme_full, abline = c(0,1)) ## qqplot
 check_model(fk_som_lme_full) ## residuals and normality of resids
 
 emmeans(fk_som_lme_full, pairwise ~ Grazing, by="year", adjust="sidak")
-## Nothing significant except year so we'll stop here
+
+# have a look at drought slopes by year
+test(emtrends(fk_som_lme_full, "year", var="Drought"))
+
+# Save to writable tables
+fk_som_raw_anova <- anova.lme(fk_som_lme_full, type="marginal")
+fk_som_raw_anova_df <- data.frame(effect=row.names(fk_som_raw_anova), fk_som_raw_anova, biomass_type="som", site="FK")
+fk_som_raw_emtrends <- data.frame(test(emtrends(fk_som_lme_full, "year", var="Drought")), biomass_type="som", site="FK")
 
 ## Thunder Basin 
-tb_live_root_lme_full <- lme(live_root_biomass_gm2 ~ as.factor(year)*Drought + as.factor(year)*Grazing + Drought*Grazing
+tb_som_lme_full <- lme(log(som_biomass_gm2) ~ as.factor(year)*Drought + as.factor(year)*Grazing + Drought*Grazing
                              , data=filter(stcrop_all, year %in% 2019:2022 & site=="TB")
                              , random = ~1 |block/Paddock/plot
                              #                                    , correlation=corCompSymm(form = ~1 |block/Paddock/plot) # aic 264.2936
                              , correlation=corAR1(form = ~1 |block/Paddock/plot) # aic 261.87 -- going with AR1
                              , control=lmeControl(returnObject=TRUE)
                              , na.action = na.omit)
-anova.lme(tb_live_root_lme_full, type="marginal")
-summary(tb_live_root_lme_full)
-hist(filter(stcrop_all, year %in% 2019:2022 & site=="TB")$live_root_biomass_gm2)
+anova.lme(tb_som_lme_full, type="marginal")
+summary(tb_som_lme_full)
+hist(log(filter(stcrop_all, year %in% 2019:2022 & site=="TB")$som_biomass_gm2))
 # check model
-qqnorm(tb_live_root_lme_full, abline = c(0,1)) ## qqplot
-check_model(tb_live_root_lme_full) ## residuals and normality of resids
+qqnorm(tb_som_lme_full, abline = c(0,1)) ## qqplot
+check_model(tb_som_lme_full) ## residuals and normality of resids
 
-## Nothing significant so we'll stop here
+# have a look at drought slopes by year
+test(emtrends(tb_som_lme_full, "year", var="Drought"))
 
+# Save to writable tables
+tb_som_raw_anova <- anova.lme(tb_som_lme_full, type="marginal")
+tb_som_raw_anova_df <- data.frame(effect=row.names(tb_som_raw_anova), tb_som_raw_anova, biomass_type="som", site="TB")
+tb_som_raw_emtrends <- data.frame(test(emtrends(tb_som_lme_full, "year", var="Drought")), biomass_type="som", site="TB")
+
+
+###
+### Stitch model findings together and write to file
+anova_root_raw_df <- fk_live_root_raw_anova_df %>% 
+  bind_rows(tb_live_root_raw_anova_df,
+            fk_som_raw_anova_df,
+            tb_som_raw_anova_df
+  )
+emtrends_root_raw_df <- fk_live_root_raw_emtrends %>% 
+  bind_rows(tb_live_root_raw_emtrends,
+            fk_som_raw_emtrends,
+            tb_som_raw_emtrends
+  )
+write.csv(anova_root_raw_df, file=paste0(table_dir,"\\live root and som_raw data_lme ANCOVA output_both sites",Sys.Date(),".csv"), row.names=F)
+write.csv(emtrends_root_raw_df, file=paste0(table_dir,"\\live root and som_raw data_lme emtrends output_both sites",Sys.Date(),".csv"), row.names=F)
 
 }
 
+###
+### Check for non-linearity of live and som models (doing this by year)
+###
+{
+  stcrop_all <- stcrop_all %>%
+    mutate(Drought2 = Drought^2)
+  
+  ### Fort Keogh live root
+  fk_live_root_quadratic_2019_lme <- lme(live_root_biomass_gm2 ~ Drought+Drought2
+                          , data=filter(stcrop_all, year==2019 & site=="FK")
+                          , random = ~1 |block/Paddock
+                          , na.action = na.omit)
+  anova.lme(fk_live_root_quadratic_2019_lme, type="marginal")
+  performance::r2(fk_anpp_2019_lme) # Marginal R2 considers only the variance of the fixed effects, which is what I want
+
+  fk_live_root_quadratic_2020_lme <- lme(live_root_biomass_gm2 ~ Drought+Drought2
+                          , data=filter(stcrop_all, year==2020 & site=="FK")
+                          , random = ~1 |block/Paddock
+                          , na.action = na.omit)
+  anova.lme(fk_live_root_quadratic_2020_lme, type="marginal")
+  performance::r2(fk_anpp_2020_lme) # Marginal R2 considers only the variance of the fixed effects, which is what I want
+  
+  fk_live_root_quadratic_2021_lme <- lme(live_root_biomass_gm2 ~ Drought+Drought2
+                                         , data=filter(stcrop_all, year==2021 & site=="FK")
+                                         , random = ~1 |block/Paddock
+                                         , na.action = na.omit)
+  anova.lme(fk_live_root_quadratic_2021_lme)
+  fk_live_root_quadratic_anova <- anova.lme(fk_live_root_quadratic_2021_lme)
+  check_model(fk_live_root_quadratic_2021_lme)
+  fk_live_root_linear_2021_lme <-  lme(live_root_biomass_gm2 ~ Drought
+                                       , data=filter(stcrop_all, year==2021 & site=="FK")
+                                       , random = ~1 |block/Paddock
+                                       , na.action = na.omit)
+  anova.lme(fk_live_root_linear_2021_lme, type="marginal")
+  AIC(fk_live_root_linear_2021_lme)
+  AIC(fk_live_root_quadratic_2021_lme)
+  performance::r2(fk_live_root_linear_2021_lme) # Marginal R2 considers only the variance of the fixed effects, which is what I want
+  performance::r2(fk_live_root_quadratic_2021_lme) # Marginal R2 considers only the variance of the fixed effects, which is what I want
+  
+  fk_live_root_2021_coeff <- fk_live_root_quadratic_2021_lme$coefficients$fixed
+  xhat <- 0:99
+  fk_live_root_2021_yhat <- fk_live_root_2021_coeff[1] + fk_live_root_2021_coeff[2]*xhat + fk_live_root_2021_coeff[3]*xhat^2
+      
+
+  fk_live_root_quadratic_2022_lme <- lme(live_root_biomass_gm2 ~ Drought+Drought2
+                                         , data=filter(stcrop_all, year==2022 & site=="FK")
+                                         , random = ~1 |block/Paddock
+                                         , na.action = na.omit)
+  anova.lme(fk_live_root_quadratic_2022_lme, type="marginal")
+  performance::r2(fk_anpp_2022_lme) # Marginal R2 considers only the variance of the fixed effects, which is what I want
+
+  fk_live_root_2022_coeff <- fk_live_root_quadratic_2022_lme$coefficients$fixed
+  xhat <- 0:99
+  fk_live_root_2022_yhat <- fk_live_root_2022_coeff[1] + fk_live_root_2022_coeff[2]*xhat + fk_live_root_2022_coeff[3]*xhat^2
+  
+  ### Fort Keogh live root
+  tb_live_root_quadratic_2019_lme <- lme(live_root_biomass_gm2 ~ Drought+Drought2
+                                         , data=filter(stcrop_all, year==2019 & site=="TB")
+                                         , random = ~1 |block/Paddock
+                                         , na.action = na.omit)
+  anova.lme(tb_live_root_quadratic_2019_lme, type="marginal")
+  performance::r2(tb_live_root_quadratic_2019_lme) # Marginal R2 considers only the variance of the fixed effects, which is what I want
+  
+  tb_live_root_quadratic_2020_lme <- lme(live_root_biomass_gm2 ~ Drought+Drought2
+                                         , data=filter(stcrop_all, year==2020 & site=="TB")
+                                         , random = ~1 |block/Paddock
+                                         , na.action = na.omit)
+  anova.lme(tb_live_root_quadratic_2020_lme, type="marginal")
+  summary(tb_live_root_quadratic_2020_lme)
+  performance::r2(tb_live_root_quadratic_2020_lme) # Marginal R2 considers only the variance of the fixed effects, which is what I want
+
+  tb_live_root_2020_coeff <- tb_live_root_quadratic_2020_lme$coefficients$fixed
+  xhat <- 0:99
+  tb_live_root_2020_yhat <- tb_live_root_2020_coeff[1] + tb_live_root_2020_coeff[2]*xhat + tb_live_root_2020_coeff[3]*xhat^2
+  
+  tb_live_root_quadratic_2021_lme <- lme(live_root_biomass_gm2 ~ Drought+Drought2
+                                         , data=filter(stcrop_all, year==2021 & site=="TB")
+                                         , random = ~1 |block/Paddock
+                                         , na.action = na.omit)
+  anova.lme(tb_live_root_quadratic_2021_lme)
+  tb_live_root_quadratic_anova <- anova.lme(tb_live_root_quadratic_2021_lme)
+  check_model(tb_live_root_quadratic_2021_lme)
+  
+  tb_live_root_quadratic_2022_lme <- lme(live_root_biomass_gm2 ~ Drought+Drought2
+                                         , data=filter(stcrop_all, year==2022 & site=="TB")
+                                         , random = ~1 |block/Paddock
+                                         , na.action = na.omit)
+  anova.lme(tb_live_root_quadratic_2022_lme, type="marginal")
+  performance::r2(tb_anpp_2022_lme) # Marginal R2 considers only the variance of the fixed effects, which is what I want
+
+  # Create trendline data frame
+  live_root_nonlinear_trendlines <- data.frame(xhat=NA, yhat=NA, site="FK",year="2019") %>%
+    bind_rows(data.frame(xhat=NA, yhat=NA, site="FK",year="2020"),
+              data.frame(xhat, yhat=fk_live_root_2021_yhat, site="FK",year="2021"),
+              data.frame(xhat, yhat=fk_live_root_2022_yhat, site="FK",year="2022"),
+              data.frame(xhat=NA, yhat=NA, site="TB",year="2019"),
+              data.frame(xhat, yhat=tb_live_root_2020_yhat, site="TB",year="2020"),
+              data.frame(xhat=NA, yhat=NA, site="TB",year="2021"),
+              data.frame(xhat=NA, yhat=NA, site="TB",year="2022")
+    )              
+    
+  
+  ### Fort Keogh SOM
+  fk_som_quadratic_2019_lme <- lme(som_biomass_gm2 ~ Drought+Drought2
+                                         , data=filter(stcrop_all, year==2019 & site=="FK")
+                                         , random = ~1 |block/Paddock
+                                         , na.action = na.omit)
+  anova.lme(fk_som_quadratic_2019_lme, type="marginal")
+  performance::r2(fk_anpp_2019_lme) # Marginal R2 considers only the variance of the fixed effects, which is what I want
+  
+  fk_som_quadratic_2020_lme <- lme(som_biomass_gm2 ~ Drought+Drought2
+                                         , data=filter(stcrop_all, year==2020 & site=="FK")
+                                         , random = ~1 |block/Paddock
+                                         , na.action = na.omit)
+  anova.lme(fk_som_quadratic_2020_lme, type="marginal")
+  performance::r2(fk_anpp_2020_lme) # Marginal R2 considers only the variance of the fixed effects, which is what I want
+  
+  fk_som_quadratic_2021_lme <- lme(som_biomass_gm2 ~ Drought+Drought2
+                                         , data=filter(stcrop_all, year==2021 & site=="FK")
+                                         , random = ~1 |block/Paddock
+                                         , na.action = na.omit)
+  anova.lme(fk_som_quadratic_2021_lme)
+  check_model(fk_som_quadratic_2021_lme)
+  fk_som_linear_2021_lme <-  lme(som_biomass_gm2 ~ Drought
+                                       , data=filter(stcrop_all, year==2021 & site=="FK")
+                                       , random = ~1 |block/Paddock
+                                       , na.action = na.omit)
+  anova.lme(fk_som_linear_2021_lme, type="marginal")
+  performance::r2(fk_som_linear_2021_lme) # Marginal R2 considers only the variance of the fixed effects, which is what I want
+  performance::r2(fk_som_quadratic_2021_lme) # Marginal R2 considers only the variance of the fixed effects, which is what I want
+  
+  fk_som_2021_coeff <- fk_som_quadratic_2021_lme$coefficients$fixed
+  xhat <- 0:99
+  fk_som_2021_yhat <- fk_som_2021_coeff[1] + fk_som_2021_coeff[2]*xhat + fk_som_2021_coeff[3]*xhat^2
+  
+  
+  fk_som_quadratic_2022_lme <- lme(som_biomass_gm2 ~ Drought+Drought2
+                                         , data=filter(stcrop_all, year==2022 & site=="FK")
+                                         , random = ~1 |block/Paddock
+                                         , na.action = na.omit)
+  anova.lme(fk_som_quadratic_2022_lme, type="marginal")
+  
+  ### Thunder basin SOM
+  tb_som_quadratic_2019_lme <- lme(som_biomass_gm2 ~ Drought+Drought2
+                                         , data=filter(stcrop_all, year==2019 & site=="TB")
+                                         , random = ~1 |block/Paddock
+                                         , na.action = na.omit)
+  anova.lme(tb_som_quadratic_2019_lme, type="marginal")
+  performance::r2(tb_som_quadratic_2019_lme) # Marginal R2 considers only the variance of the fixed effects, which is what I want
+  tb_som_linear_2019_lme <- lme(som_biomass_gm2 ~ Drought
+                                   , data=filter(stcrop_all, year==2019 & site=="TB")
+                                   , random = ~1 |block/Paddock
+                                   , na.action = na.omit)
+  anova.lme(tb_som_linear_2019_lme, type="marginal")
+  tb_som_2019_coeff <- tb_som_linear_2019_lme$coefficients$fixed
+  xhat <- 0:99
+  tb_som_2019_yhat <- tb_som_2019_coeff[1] + tb_som_2019_coeff[2]*xhat
+  
+
+  tb_som_quadratic_2020_lme <- lme(som_biomass_gm2 ~ Drought+Drought2
+                                         , data=filter(stcrop_all, year==2020 & site=="TB")
+                                         , random = ~1 |block/Paddock
+                                         , na.action = na.omit)
+  anova.lme(tb_som_quadratic_2020_lme, type="marginal")
+  summary(tb_som_quadratic_2020_lme)
+  performance::r2(tb_som_quadratic_2020_lme) # Marginal R2 considers only the variance of the fixed effects, which is what I want
+  tb_som_linear_2020_lme <- lme(som_biomass_gm2 ~ Drought
+                                , data=filter(stcrop_all, year==2020 & site=="TB")
+                                , random = ~1 |block/Paddock
+                                , na.action = na.omit)
+  anova.lme(tb_som_linear_2020_lme, type="marginal")
+  tb_som_2020_coeff <- tb_som_linear_2020_lme$coefficients$fixed
+  xhat <- 0:99
+  tb_som_2020_yhat <- tb_som_2020_coeff[1] + tb_som_2020_coeff[2]*xhat
+  
+  
+  tb_som_quadratic_2021_lme <- lme(som_biomass_gm2 ~ Drought+Drought2
+                                         , data=filter(stcrop_all, year==2021 & site=="TB")
+                                         , random = ~1 |block/Paddock
+                                         , na.action = na.omit)
+  anova.lme(tb_som_quadratic_2021_lme)
+  tb_som_quadratic_anova <- anova.lme(tb_som_quadratic_2021_lme)
+  check_model(tb_som_quadratic_2021_lme)
+  tb_som_linear_2021_lme <- lme(som_biomass_gm2 ~ Drought
+                                , data=filter(stcrop_all, year==2021 & site=="TB")
+                                , random = ~1 |block/Paddock
+                                , na.action = na.omit)
+  anova.lme(tb_som_linear_2021_lme, type="marginal")
+  
+  tb_som_quadratic_2022_lme <- lme(som_biomass_gm2 ~ Drought+Drought2
+                                         , data=filter(stcrop_all, year==2022 & site=="TB")
+                                         , random = ~1 |block/Paddock
+                                         , na.action = na.omit)
+  anova.lme(tb_som_quadratic_2022_lme, type="marginal")
+  performance::r2(tb_anpp_2022_lme) # Marginal R2 considers only the variance of the fixed effects, which is what I want
+  tb_som_linear_2022_lme <- lme(som_biomass_gm2 ~ Drought
+                                   , data=filter(stcrop_all, year==2022 & site=="TB")
+                                   , random = ~1 |block/Paddock
+                                   , na.action = na.omit)
+  anova.lme(tb_som_linear_2022_lme, type="marginal")
+  check_model(tb_som_linear_2022_lme)
+
+  # Create trendline data frame
+  som_nonlinear_trendlines <- data.frame(xhat=NA, yhat=NA, site="FK",year="2019") %>%
+    bind_rows(data.frame(xhat=NA, yhat=NA, site="FK",year="2020"),
+              data.frame(xhat, yhat=fk_som_2021_yhat, site="FK",year="2021"),
+              data.frame(xhat=NA, yhat=NA, site="FK",year="2022"),
+              data.frame(xhat, yhat=tb_som_2019_yhat, site="TB",year="2019"),
+              data.frame(xhat, yhat=tb_som_2020_yhat, site="TB",year="2020"),
+              data.frame(xhat=NA, yhat=NA, site="TB",year="2021"),
+              data.frame(xhat=NA, yhat=NA, site="TB",year="2022")
+    )              
+  
+              
+  }
 
 ###
 ### Plotting response ratios
 ###
-
+{
   stcrop_rr_drought_means <- stcrop_rr_long %>%
     filter(!(year==2022 & plot==44 & site=="FK")) %>% ### plot 44 is a clear outlier
     group_by(site, year, metric_type, Drought) %>%
@@ -408,30 +714,55 @@ print(stcrop_fig)
 dev.off()
   
   
+}
   
-  
-  
+###
+### Plotting raw data means (not response ratios)
+###
+{
 
-stcrop_means <- stcrop_raw %>%
-  group_by(Year, Site, Drought) %>%
-  summarize(stcrop_mean = mean(stcrop_gm2, na.rm=T),
-            stcrop_se = SE_function(stcrop_gm2),
-            som_mean = mean(som_gm2, na.rm=T),
-            som_se = SE_function(som_gm2))
+stcrop_means <- stcrop_all %>%
+  group_by(year, site, Drought) %>%
+  summarize(live_root_mean = mean(live_root_biomass_gm2, na.rm=T),
+            live_root_se = SE_function(live_root_biomass_gm2),
+            som_mean = mean(som_biomass_gm2, na.rm=T),
+            som_se = SE_function(som_biomass_gm2),
+            .groups="drop")
 
-ggplot(stcrop_means, aes(Drought, stcrop_mean, ymin=stcrop_mean-stcrop_se, ymax=stcrop_mean+stcrop_se)) +
-  geom_errorbar(width=0) + geom_point() + geom_smooth(method="lm", se=F) + facet_grid(~Year) +
-  ylab("Live roots (g/m2)") 
+# live roots
+live_root_raw_figure <- ggplot(filter(stcrop_means,year%in%2019:2022), aes(Drought, live_root_mean, ymin=live_root_mean-live_root_se, ymax=live_root_mean+live_root_se)) +
+                        geom_errorbar(width=0) + geom_point() + 
+                        geom_line(inherit.aes=F, data=live_root_nonlinear_trendlines, aes(x=xhat, y=yhat)) +
+                        facet_grid(site~year) +
+                        ylab("Live roots (g/m2)") + xlab("Rainfall reduction (%)") + theme_few()
 
-ggplot(stcrop_means, aes(Drought, som_mean, ymin=som_mean-som_se, ymax=som_mean+som_se)) +
-  geom_errorbar(width=0) + geom_point() + geom_smooth(method="lm", se=F) + facet_grid(~Year) +
-  ylab("SOM (g/m2)") 
+pdf(paste0(figure_dir, "\\live root figure_",Sys.Date(),".pdf"), width=9, height=4.25, useDingbats = F)
+print(live_root_raw_figure)
+dev.off()
 
-ggsave("..//..//figures//standing_crop//tb_standing crop_19-22.png", width=10, height=4, units="in")
+ggsave(paste0(figure_dir, "\\live root figure_",Sys.Date(),".png"),width=9, height=4.25,units="in")
 
-ggplot(stcrop_raw, aes(x=Year, y=live_root_g)) + geom_jitter()
-ggplot(stcrop_raw, aes(x=Year, y=live_root_gm2)) + geom_jitter()
+# som
+som_raw_figure <- ggplot(filter(stcrop_means,year%in%2019:2022), aes(Drought, som_mean, ymin=som_mean-som_se, ymax=som_mean+som_se)) +
+  geom_errorbar(width=0) + geom_point() + 
+  geom_line(inherit.aes=F, data=som_nonlinear_trendlines, aes(x=xhat, y=yhat)) +
+  facet_grid(site~year) +
+  ylab("Dead roots + SOM (g/m2)") + xlab("Rainfall reduction (%)") + theme_few()
 
+pdf(paste0(figure_dir, "\\som figure_",Sys.Date(),".pdf"), width=9, height=4.25, useDingbats = F)
+print(som_raw_figure)
+dev.off()
+
+ggsave(paste0(figure_dir, "\\som figure_",Sys.Date(),".png"),width=9, height=4.25,units="in")
+
+
+}
+
+
+###
+### Extra code below
+###
+{
 stcrop_raw$Grazing <- factor(stcrop_raw$Grazing, levels=c("MLLMM","MMMMM","HHMMM"))
 stcrop_raw$Year <- factor(stcrop_raw$Year)
 full_model_tb_rm <- lme(stcrop_gm2 ~ Drought*Grazing + Drought*Year + Grazing*Year
@@ -849,6 +1180,6 @@ ggplot(stcrop_grz_means, aes(x=Grazing, y=live_root_mean, ymin=live_root_mean-li
   summary(c3p_stcrop_regression)
 }
 
-
+}
 
 
