@@ -140,9 +140,9 @@ ggplot(filter(anpp_fxn_grps, fxn_type=="Forb_gm2"&Year==2023&Site=="FK"), aes(x=
   
   emtrends(fk_c3p_model_full, "Year", var="Drought")
   test(emtrends(fk_c3p_model_full, "Year", var="Drought"))
-  # emmeans(fk_anpp_model_full, "Grazing", by="Year")
-  # pairs(emmeans(fk_anpp_model_full, "Grazing", by="Year")) ## Nothing comes out in the multiple comparison
-  
+  emmeans(fk_anpp_model_full, "Grazing", by="Year")
+  pairs(emmeans(fk_anpp_model_full, "Grazing", by="Year")) ## Nothing comes out in the multiple comparison
+
   # Save to writable tables
   fk_c3p_anova_df <- data.frame(effect=row.names(fk_c3p_anova), fk_c3p_anova, fxn_type="C3P", site="FK")
   fk_c3p_emtrends <- data.frame(test(emtrends(fk_c3p_model_full, "Year", var="Drought")), fxn_type="C3P", site="FK")
