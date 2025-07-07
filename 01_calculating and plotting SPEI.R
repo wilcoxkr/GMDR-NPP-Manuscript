@@ -65,6 +65,20 @@ fk_monthly <- fk_daymet %>%
             )%>%
   ungroup()
 
+tb_annual <- tb_monthly %>%
+  group_by(MONTH, .drop=T) %>%
+  summarize(TMAX = mean(TMAX, na.rm=T),
+            TMIN = mean(TMIN, na.rm=T),
+            PRCP = mean(PRCP, na.rm=T)
+  )
+
+ggplot(tb_annual, aes(as.factor(MONTH), TMAX))+ geom_col()
+max(tb_annual$TMAX)
+ggplot(tb_annual, aes(as.factor(MONTH), TMIN))+ geom_col()
+min(tb_annual$TMIN)
+ggplot(tb_annual, aes(as.factor(MONTH), PRCP))+ geom_col()
+min(tb_annual$TMIN)
+
 ### Calculate PET and balance between PET and PPT
 tb_spei <- tb_monthly %>%
   mutate(PET=thornthwaite(TMED, 43.30)) %>%
