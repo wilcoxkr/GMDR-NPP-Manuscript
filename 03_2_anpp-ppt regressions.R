@@ -111,6 +111,27 @@ source("C:\\Users\\wilco\\OneDrive - UNCG\\Git projects\\Grazing-Management-for-
   
 }
 
+###
+### Multiple regression models with single year, previous year, and 2 year cumulative rain-year precipitation
+###
+### NOTE KW: ACTUALLY, SINCE THE PRECIPITATION VALUES ARE SO COLINEAR, WE SHOULDN'T DO A MULTIPLE REGRESSION.
+###           INSTEAD, WE WILL JUST STICK TO RUNNING INDIVIDUAL MODELS FOR EACH PRECPITATION METRIC
+
+## Fort Keogh
+##
+fk_ppt_multReg_mod <- lm(sqrt(npp_gm2)~rain_year_ppt+ppt_prev1+ppt_2Yr,
+                         data=filter(npp_ppt_2yr_df, Site=="FK"&npp_type=="ANPP")
+                         )
+fk_ppt_multReg_mod <- lm(sqrt(npp_gm2)~ppt_2Yr+rain_year_ppt+ppt_prev1,
+                         data=filter(npp_ppt_2yr_df, Site=="FK"&npp_type=="ANPP")
+                         )
+Anova(fk_ppt_multReg_mod, type=3)
+
+filter(npp_ppt_2yr_df, Site=="FK")$ppt_2Yr
+filter(npp_ppt_2yr_df, Site=="FK")$ppt_prev1
+
+with(filter(npp_ppt_2yr_df, Site=="FK"&npp_type=="ANPP"), plot(ppt_prev1,ppt_2Yr))
+
 
 ###
 ### Testing linear vs non-linear slopes for 1 and 2 year models (STILL NEEDS TO BE CLEANED UP A BIT)
@@ -139,7 +160,13 @@ source("C:\\Users\\wilco\\OneDrive - UNCG\\Git projects\\Grazing-Management-for-
   
   # For trendlines in Fig 3
   fk_current_ppt_lm <- lm(sqrt(npp_gm2)~rain_year_ppt, data=filter(npp_ppt_df, npp_type=="ANPP"& Site=="FK"))
+  Anova(fk_current_ppt_lm, typt=3)
   performance::r2(fk_current_ppt_lm)
+
+  # testing whether the exclusion of 2018 data changes anything
+  fk_current_ppt_lm_no2018 <- lm(sqrt(npp_gm2)~rain_year_ppt, data=filter(npp_ppt_df, npp_type=="ANPP"& Site=="FK" & Year!=2018))
+  Anova(fk_current_ppt_lm_no2018, typt=3)
+  performance::r2(fk_current_ppt_lm_no2018)
   
   fk_current_ppt_xhat <- with(filter(npp_ppt_df, npp_type=="ANPP"& Site=="FK"), seq(min(rain_year_ppt), max(rain_year_ppt), by=1))
   fk_current_ppt_df <- data.frame(rain_year_ppt=fk_current_ppt_xhat)
@@ -154,8 +181,13 @@ source("C:\\Users\\wilco\\OneDrive - UNCG\\Git projects\\Grazing-Management-for-
   )
   
   tb_current_ppt_lm <- lm(sqrt(npp_gm2)~rain_year_ppt, data=filter(npp_ppt_df, npp_type=="ANPP"& Site=="TB"))
-  summary(tb_current_ppt_lm)
+  Anova(tb_current_ppt_lm, type=3)
   performance::r2(tb_current_ppt_lm)
+
+  # testing whether the exclusion of 2018 data changes anything
+  tb_current_ppt_lm_no2018 <- lm(sqrt(npp_gm2)~rain_year_ppt, data=filter(npp_ppt_df, npp_type=="ANPP"& Site=="TB" & Year!=2018))
+  Anova(tb_current_ppt_lm_no2018, typt=3)
+  performance::r2(tb_current_ppt_lm_no2018)
   
   tb_current_ppt_xhat <- with(filter(npp_ppt_df, npp_type=="ANPP"& Site=="TB"), seq(min(rain_year_ppt), max(rain_year_ppt), by=1))
   tb_current_ppt_df <- data.frame(rain_year_ppt=tb_current_ppt_xhat)
@@ -195,6 +227,7 @@ source("C:\\Users\\wilco\\OneDrive - UNCG\\Git projects\\Grazing-Management-for-
   
   # For trendlines and r2 in Fig 3
   fk_ppt_2yr_lm <- lm(log(npp_gm2)~ppt_2Yr, data=filter(npp_ppt_2yr_df, npp_type=="ANPP"& Site=="FK"))
+  Anova(fk_ppt_2yr_lm, type=3)
   performance::r2(fk_ppt_2yr_lm)
   
   fk_ppt_2yr_xhat <- with(filter(npp_ppt_2yr_df, npp_type=="ANPP"& Site=="FK" & Year %in% 2019:2023), seq(min(ppt_2Yr), max(ppt_2Yr), by=1))
@@ -210,7 +243,7 @@ source("C:\\Users\\wilco\\OneDrive - UNCG\\Git projects\\Grazing-Management-for-
   )
   
   tb_ppt_2yr_lm <- lm(log(npp_gm2)~ppt_2Yr, data=filter(npp_ppt_2yr_df, npp_type=="ANPP"& Site=="TB"))
-  summary(tb_ppt_2yr_lm)
+  Anova(tb_ppt_2yr_lm)
   performance::r2(tb_ppt_2yr_lm)
   
   tb_ppt_2yr_xhat <- with(filter(npp_ppt_2yr_df, npp_type=="ANPP"& Site=="TB"&Year%in%2019:2023), seq(min(ppt_2Yr), max(ppt_2Yr), by=1))
@@ -228,10 +261,74 @@ source("C:\\Users\\wilco\\OneDrive - UNCG\\Git projects\\Grazing-Management-for-
   ppt_2yr_trendlines_both <- tb_ppt_2yr_trendlines %>%
     bind_rows(fk_ppt_2yr_trendlines)
   
+  
+  ### previous year precip models
+  ## Testing transformations - LOG MODELS HAVE HIGHEST R2
+  performance::r2(lm(npp_gm2~ppt_prev1*Site, data=filter(npp_ppt_2yr_df,npp_type=="ANPP")))
+  performance::r2(lm(log(npp_gm2)~ppt_prev1*Site, data=filter(npp_ppt_2yr_df,npp_type=="ANPP")))
+  performance::r2(lm(sqrt(npp_gm2)~ppt_prev1*Site, data=filter(npp_ppt_2yr_df,npp_type=="ANPP")))
+  
+  performance::r2(lm(npp_gm2~ppt_prev1, data=filter(npp_ppt_2yr_df,npp_type=="ANPP"&Site=="FK")))
+  performance::r2(lm(log(npp_gm2)~ppt_prev1, data=filter(npp_ppt_2yr_df,npp_type=="ANPP"&Site=="FK")))
+  performance::r2(lm(sqrt(npp_gm2)~ppt_prev1, data=filter(npp_ppt_2yr_df,npp_type=="ANPP"&Site=="FK")))
+  
+  performance::r2(lm(npp_gm2~ppt_prev1, data=filter(npp_ppt_2yr_df,npp_type=="ANPP"&Site=="TB")))
+  performance::r2(lm(log(npp_gm2)~ppt_prev1, data=filter(npp_ppt_2yr_df,npp_type=="ANPP"&Site=="TB")))
+  performance::r2(lm(sqrt(npp_gm2)~ppt_prev1, data=filter(npp_ppt_2yr_df,npp_type=="ANPP"&Site=="TB")))
+  
+  ppt_prev1_anpp_lm <- lm(log(npp_gm2)~ppt_prev1*Site, data=filter(npp_ppt_2yr_df,npp_type=="ANPP"))
+  Anova(ppt_prev1_anpp_lm, type=3)
+  ppt_2yr_anpp_anova <- Anova(ppt_2yr_anpp_lm, type=3)
+  # Significant interaction, split by site
+  
+  plot(ppt_prev1_anpp_lm)
+  hist(log(filter(npp_ppt_2yr_df,npp_type=="ANPP")$npp_gm2))
+
+  ppt_prev1_anpp_anova <- Anova(ppt_prev1_anpp_lm, type=3)
+  ppt_prev1_anova_df <- data.frame(effect=row.names(ppt_prev1_anpp_anova), ppt_prev1_anpp_anova, ppt_type="prev1")
+  ppt_prev1_diff_emtrends <- data.frame(test(emtrends(ppt_prev1_anpp_lm, "Site", var="ppt_prev1")), ppt_type="prev1")
+  
+  # For trendlines and r2 in Fig 3
+  fk_ppt_prev1_lm <- lm(log(npp_gm2)~ppt_prev1, data=filter(npp_ppt_2yr_df, npp_type=="ANPP"& Site=="FK"))
+  Anova(fk_ppt_prev1_lm, type=3)
+  performance::r2(fk_ppt_prev1_lm)
+  
+  fk_ppt_prev1_xhat <- with(filter(npp_ppt_2yr_df, npp_type=="ANPP"& Site=="FK" & Year %in% 2019:2023), seq(min(ppt_prev1), max(ppt_prev1), by=1))
+  fk_ppt_prev1_df <- data.frame(ppt_prev1=fk_ppt_prev1_xhat)
+  fk_ppt_prev1_yhat <- predict.lm(fk_ppt_prev1_lm, newdata = fk_ppt_prev1_df)
+  plot(fk_ppt_prev1_xhat, exp(fk_ppt_prev1_yhat))
+  
+  fk_ppt_prev1_trendlines <- data.frame(
+    xhat=fk_ppt_prev1_xhat,
+    yhat=fk_ppt_prev1_yhat,
+    Site="FK",
+    ppt_type="prev1"
+  )
+  
+  tb_ppt_prev1_lm <- lm(log(npp_gm2)~ppt_prev1, data=filter(npp_ppt_2yr_df, npp_type=="ANPP"& Site=="TB"))
+  Anova(tb_ppt_prev1_lm, type=3)
+  performance::r2(tb_ppt_prev1_lm)
+  
+  tb_ppt_prev1_xhat <- with(filter(npp_ppt_2yr_df, npp_type=="ANPP"& Site=="TB"&Year%in%2019:2023), seq(min(ppt_prev1), max(ppt_prev1), by=1))
+  tb_ppt_prev1_df <- data.frame(ppt_prev1=tb_ppt_prev1_xhat)
+  tb_ppt_prev1_yhat <- predict.lm(tb_ppt_prev1_lm, newdata = tb_ppt_prev1_df)
+  plot(tb_ppt_prev1_xhat, exp(tb_ppt_prev1_yhat))
+  
+  tb_ppt_prev1_trendlines <- data.frame(
+    xhat=tb_ppt_prev1_xhat,
+    yhat=tb_ppt_prev1_yhat,
+    Site="TB",
+    ppt_type="prev1"
+  )
+  
+  ppt_prev1_trendlines_both <- tb_ppt_prev1_trendlines %>%
+    bind_rows(fk_ppt_prev1_trendlines)
 }
 
+
+
 ###
-### Plotting 1 year and 2 year vs ANPP and BNPP by site
+### Plotting 1 year, prev year, and 2 year cumulative vs ANPP and BNPP by site
 ###
 {
   # current year
@@ -240,12 +337,26 @@ source("C:\\Users\\wilco\\OneDrive - UNCG\\Git projects\\Grazing-Management-for-
     geom_point(col="black", size=3) +
     geom_line(inherit.aes=F, data=current_ppt_trendlines_both, aes(x=xhat, y=yhat^2), col="black") +
     scale_fill_manual(values=droughtColor) +
-    scale_shape_manual(values=c(13,21:25)) +
+    scale_shape_manual(values=c(13,21,24,22,23,25)) +
     facet_wrap(~Site, scales="free_y") +
     theme_few()
   
   pdf(paste0(write_dir, "figures//ppt-anpp regression currenty rainYear",Sys.Date(),".pdf"), width=7, height=3, useDingbats = F)
   print(ppt1yrPlot)
+  dev.off()
+  
+  # previous year
+  pptPrev1Plot <- ggplot(filter(npp_ppt_2yr_means,npp_type=="ANPP"), aes(x=ppt_prev1, y=npp_mean, ymin=npp_mean-npp_se, ymax=npp_mean+npp_se, fill=factor(Drought), shape=factor(Year))) +
+    geom_errorbar(width=15, col="black") +
+    geom_point(col="black", size=3) +
+    geom_line(inherit.aes=F, data=ppt_prev1_trendlines_both, aes(x=xhat, y=exp(yhat)), col="black") +
+    scale_fill_manual(values=droughtColor) +
+    scale_shape_manual(values=c(13,21,24,22,23,25)) +
+    facet_wrap(~Site, scales="free_y") +
+    theme_few()
+  
+  pdf(paste0(write_dir, "figures//ppt-anpp regression Previous year ppt",Sys.Date(),".pdf"), width=7, height=3, useDingbats = F)
+  print(pptPrev1Plot)
   dev.off()
   
   
@@ -255,7 +366,7 @@ source("C:\\Users\\wilco\\OneDrive - UNCG\\Git projects\\Grazing-Management-for-
     geom_point(size=3) +
     geom_line(inherit.aes=F, data=ppt_2yr_trendlines_both, aes(x=xhat, y=exp(yhat)), col="black") +
     scale_fill_manual(values=droughtColor) +
-    scale_shape_manual(values=c(13,21:25)) +
+    scale_shape_manual(values=c(13,21,24,22,23,25)) +
     facet_wrap(~Site, scales="free_y") +
     theme_few()
   
@@ -265,6 +376,25 @@ source("C:\\Users\\wilco\\OneDrive - UNCG\\Git projects\\Grazing-Management-for-
   
 }
 
+###
+### Models splitting by grazing treatments
+###
+{
+fk_current_ppt_grazing_lm <- lm(sqrt(npp_gm2)~rain_year_ppt*Grazing, data=filter(npp_ppt_df, npp_type=="ANPP"& Site=="FK"))
+Anova(fk_current_ppt_grazing_lm, type=3)
+tb_current_ppt_grazing_lm <- lm(sqrt(npp_gm2)~rain_year_ppt*Grazing, data=filter(npp_ppt_df, npp_type=="ANPP"& Site=="TB"))
+Anova(tb_current_ppt_grazing_lm, type=3)
+
+fk_prev1_ppt_grazing_lm <- lm(log(npp_gm2)~ppt_prev1*Grazing, data=filter(npp_ppt_2yr_df, npp_type=="ANPP"& Site=="FK"))
+Anova(fk_prev1_ppt_grazing_lm, type=3)
+tb_prev1_ppt_grazing_lm <- lm(log(npp_gm2)~ppt_prev1*Grazing, data=filter(npp_ppt_2yr_df, npp_type=="ANPP"& Site=="TB"))
+Anova(tb_prev1_ppt_grazing_lm, type=3)
+
+fk_2yr_ppt_grazing_lm <- lm(log(npp_gm2)~ppt_2Yr*Grazing, data=filter(npp_ppt_2yr_df, npp_type=="ANPP"& Site=="FK"))
+Anova(fk_2yr_ppt_grazing_lm, type=3)
+tb_2yr_ppt_grazing_lm <- lm(log(npp_gm2)~ppt_2Yr*Grazing, data=filter(npp_ppt_2yr_df, npp_type=="ANPP"& Site=="TB"))
+Anova(tb_2yr_ppt_grazing_lm, type=3)
+}
 
 ###
 ### Plotting slopes varying by grazing treatment
