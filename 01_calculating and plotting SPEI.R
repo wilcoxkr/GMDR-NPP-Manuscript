@@ -266,8 +266,7 @@ for(TRT in 1:length(fk_trt_vec)){
   
 ### Combine spei datasets for both sites
 spei_df_all <- fk_spei_master %>%
-  bind_rows(tb_spei_master) %>%
-  year_month  
+  bind_rows(tb_spei_master) 
 
 droughtColor <- c('#feedde', '#fdbe85', '#fd8d3c', '#e6550d', '#a63603')
 
@@ -332,6 +331,8 @@ dev.off()
     ungroup() %>%
     left_join(prob_key_for_plotting, by="rain_year") %>%
     filter(rain_year %in% 2018:2023)
+  
+  fk_trt_rainyr$prob <- dnorm(fk_trt_rainyr$ppt_trt_rainyr, mean=mean(fk_rainyr_ppt$PRCP_RAINYR), sd=sd(fk_rainyr_ppt$PRCP_RAINYR))*100
 
   ### Plot up probabilities
 
@@ -359,6 +360,8 @@ fk_prob_fig <-  ggplot(fk_dnorm, aes(prcp_hat, probability, fill=yr_type)) +
 pdf("..//..//npp_manuscript//figures//fk rainyear distribution fig_v1.pdf", width=6, height=3.3, useDingbats = F)
 print(fk_prob_fig)
 dev.off()
+
+
 
 ### Thunder Basin
 ###
@@ -394,6 +397,7 @@ tb_trt_rainyr <- tb_trt_ppt %>%
   ungroup() %>%
   left_join(prob_key_for_plotting, by="rain_year") %>%
   filter(rain_year %in% 2018:2023)
+tb_trt_rainyr$prob <- dnorm(tb_trt_rainyr$ppt_trt_rainyr, mean=mean(tb_rainyr_ppt$PRCP_RAINYR), sd=sd(tb_rainyr_ppt$PRCP_RAINYR))*100
 
 ### Plot up probabilities
 
@@ -466,6 +470,8 @@ fk_trt_2yr <- fk_trt_ppt %>%
   dplyr::select(rain_year,ppt_2yr_0:ppt_2yr_99) %>%
   pivot_longer(cols=ppt_2yr_0:ppt_2yr_99, names_to="Drought", values_to="ppt_2yr", names_prefix="ppt_2yr_")
 
+fk_trt_2yr$prob <- dnorm(fk_trt_2yr$ppt_2yr, mean=mean(fk_2yr_ppt$ppt_2yr,na.rm=T), sd=sd(fk_2yr_ppt$ppt_2yr,na.rm=T))*100
+
 ### Plot up probabilities
 fk_2yr_dnorm <- data.frame(prcp_hat = seq(200,1200,1),
                        probability = dnorm(seq(200,1200,1), mean=mean(fk_2yr_ppt$ppt_2yr, na.rm=T), sd=sd(fk_2yr_ppt$ppt_2yr, na.rm=T))*100
@@ -528,6 +534,8 @@ tb_trt_2yr <- tb_trt_ppt %>%
   ) %>%
   dplyr::select(rain_year,ppt_2yr_0:ppt_2yr_99) %>%
   pivot_longer(cols=ppt_2yr_0:ppt_2yr_99, names_to="Drought", values_to="ppt_2yr", names_prefix="ppt_2yr_")
+
+  tb_trt_2yr$prob <- dnorm(tb_trt_2yr$ppt_2yr, mean=mean(tb_2yr_ppt$ppt_2yr,na.rm=T), sd=sd(tb_2yr_ppt$ppt_2yr,na.rm=T))*100
 
 ### Plot up probabilities
 tb_2yr_dnorm <- data.frame(prcp_hat = seq(200,1200,1),
