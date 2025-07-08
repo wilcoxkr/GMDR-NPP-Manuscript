@@ -500,6 +500,24 @@ write.csv(npp_master, file=paste0(write_dir,"data_sets\\ANPP BNPP total NPP_plot
   # Save to writable tables
   fk_bnpp_anova_df <- data.frame(effect=row.names(fk_bnpp_anova), fk_bnpp_anova, site="FK")
 
+  ### Checking 2020 and 2021 for drought by grazing effects to test herbivory mechanism
+  fk_bnpp_model_2020 <- lme(lnrr_npp ~ Drought*Grazing
+                            , data=filter(npp_rr, Year == 2020 & Site=="FK" & npp_type=="BNPP")
+                            , random = ~1 |Block/Paddock
+                            , na.action = na.omit)
+  fk_bnpp_anova_2020 <- anova.lme(fk_bnpp_model_2020, type="marginal")
+  plot(fk_bnpp_model_2020, type=c("p","smooth"), col.line=1)
+  qqnorm(fk_bnpp_model_2020, abline = c(0,1)) ## qqplot
+  hist(filter(npp_rr, Year %in% 2020 & Site=="FK" & npp_type=="BNPP")$lnrr_npp)
+  
+  fk_bnpp_model_2021 <- lme(lnrr_npp ~ Drought*Grazing
+                            , data=filter(npp_rr, Year == 2021 & Site=="FK" & npp_type=="BNPP")
+                            , random = ~1 |Block/Paddock
+                            , na.action = na.omit)
+  fk_bnpp_anova_2021 <- anova.lme(fk_bnpp_model_2021, type="marginal")
+  plot(fk_bnpp_model_2021, type=c("p","smooth"), col.line=1)
+  qqnorm(fk_bnpp_model_2021, abline = c(0,1)) ## qqplot
+  hist(filter(npp_rr, Year %in% 2021 & Site=="FK" & npp_type=="BNPP")$lnrr_npp)
   
   ### Thunder Basin
   ###
@@ -520,10 +538,30 @@ write.csv(npp_master, file=paste0(write_dir,"data_sets\\ANPP BNPP total NPP_plot
 
   
   
-  ### WRite tables of model output for both sites
+  ### Write tables of model output for both sites
   anova_bnpp_df <- tb_bnpp_anova_df %>% bind_rows(fk_bnpp_anova_df)
   write.csv(anova_bnpp_df, file=paste0(write_dir,"tables\\bnpp lme ANCOVA output_both sites",Sys.Date(),".csv"), row.names=F)
 
+  ### Checking 2020 and 2021 for drought by grazing effects to test herbivory mechanism
+  tb_bnpp_model_2020 <- lme(lnrr_npp ~ Drought*Grazing
+                            , data=filter(npp_rr, Year == 2020 & Site=="TB" & npp_type=="BNPP")
+                            , random = ~1 |Block/Paddock
+                            , na.action = na.omit)
+  tb_bnpp_anova_2020 <- anova.lme(tb_bnpp_model_2020, type="marginal")
+  plot(tb_bnpp_model_2020, type=c("p","smooth"), col.line=1)
+  qqnorm(tb_bnpp_model_2020, abline = c(0,1)) ## qqplot
+  hist(filter(npp_rr, Year %in% 2020 & Site=="TB" & npp_type=="BNPP")$lnrr_npp)
+  
+  tb_bnpp_model_2021 <- lme(lnrr_npp ~ Drought*Grazing
+                            , data=filter(npp_rr, Year == 2021 & Site=="TB" & npp_type=="BNPP")
+                            , random = ~1 |Block/Paddock
+                            , na.action = na.omit)
+  tb_bnpp_anova_2021 <- anova.lme(tb_bnpp_model_2021, type="marginal")
+  plot(tb_bnpp_model_2021, type=c("p","smooth"), col.line=1)
+  qqnorm(tb_bnpp_model_2021, abline = c(0,1)) ## qqplot
+  hist(filter(npp_rr, Year %in% 2021 & Site=="TB" & npp_type=="BNPP")$lnrr_npp)
+  
+  ### Copied manually to table
    
 }
  
@@ -818,4 +856,17 @@ dev.off()
 
 ggsave(filename=paste0(write_dir, "figures//raw bnpp figure", Sys.Date(), ".jpeg"), plot=bnpp_raw_fig, width=9, height=4.5, units="in", dpi=300)
 }
+
+
+###
+### CAlculating percent change means for results text
+###
+npp_pchange_drought_means <- npp_rr %>%
+  filter(Year %in% 2019:2023) %>% ### plot 44 is a clear outlier
+  group_by(Site, Year, npp_type, Drought) %>%
+  summarize_at(.vars=vars(pchange_npp), .funs=list(mean=mean, se=SE_function), na.rm=T) %>%
+  ungroup() %>%
+  rename(pchange_mean = mean, pchange_se = se)
+
+
 
