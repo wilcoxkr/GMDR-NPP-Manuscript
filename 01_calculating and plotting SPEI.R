@@ -278,7 +278,7 @@ spei_fig <- ggplot(filter(spei_df_all, Drought==0 & YEAR %in% 2018:2023), aes(x=
              aes(x=DATE, y=SPEI, col=as.factor(Drought), linetype=as.factor(Drought))) +
   geom_point(inherit.aes=F, data=filter(spei_df_all, DATE>="2019-05-01" & DATE<="2021-12-28"), 
              aes(x=DATE, y=SPEI, fill=as.factor(Drought), shape=as.factor(Drought)), col="black") +
-  scale_shape_manual(values=21:25) +
+  scale_shape_manual(values=c(21,24,22,23,25)) +
   scale_fill_manual(values=droughtColor[1:5]) +
   scale_color_manual(values=droughtColor[1:5]) +
   facet_grid(site~.) +
@@ -286,7 +286,7 @@ spei_fig <- ggplot(filter(spei_df_all, Drought==0 & YEAR %in% 2018:2023), aes(x=
   theme_few() +
   theme(axis.text.x = element_text(angle=45, hjust=1, size=8))
   
-pdf("..//..//npp_manuscript//figures//SPEI figure_v1.pdf", width=9, height=5.4, useDingbats = F)
+pdf("..//..//npp_manuscript//figures//SPEI figure_v2.pdf", width=9, height=5.4, useDingbats = F)
 print(spei_fig)
 dev.off()
 

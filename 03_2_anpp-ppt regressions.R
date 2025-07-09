@@ -116,7 +116,7 @@ source("C:\\Users\\wilco\\OneDrive - UNCG\\Git projects\\Grazing-Management-for-
 ###
 ### NOTE KW: ACTUALLY, SINCE THE PRECIPITATION VALUES ARE SO COLINEAR, WE SHOULDN'T DO A MULTIPLE REGRESSION.
 ###           INSTEAD, WE WILL JUST STICK TO RUNNING INDIVIDUAL MODELS FOR EACH PRECPITATION METRIC
-
+{
 ## Fort Keogh
 ##
 fk_ppt_multReg_mod <- lm(sqrt(npp_gm2)~rain_year_ppt+ppt_prev1+ppt_2Yr,
@@ -131,7 +131,7 @@ filter(npp_ppt_2yr_df, Site=="FK")$ppt_2Yr
 filter(npp_ppt_2yr_df, Site=="FK")$ppt_prev1
 
 with(filter(npp_ppt_2yr_df, Site=="FK"&npp_type=="ANPP"), plot(ppt_prev1,ppt_2Yr))
-
+}
 
 ###
 ### Testing linear vs non-linear slopes for 1 and 2 year models (STILL NEEDS TO BE CLEANED UP A BIT)

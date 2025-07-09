@@ -504,6 +504,7 @@ write.csv(emtrends_root_raw_df, file=paste0(table_dir,"\\live root and som_raw d
                                        , random = ~1 |block/Paddock
                                        , na.action = na.omit)
   anova.lme(fk_live_root_linear_2021_lme, type="marginal")
+  summary(fk_live_root_linear_2021_lme)
   AIC(fk_live_root_linear_2021_lme)
   AIC(fk_live_root_quadratic_2021_lme)
   performance::r2(fk_live_root_linear_2021_lme) # Marginal R2 considers only the variance of the fixed effects, which is what I want
@@ -519,7 +520,7 @@ write.csv(emtrends_root_raw_df, file=paste0(table_dir,"\\live root and som_raw d
                                          , random = ~1 |block/Paddock
                                          , na.action = na.omit)
   anova.lme(fk_live_root_quadratic_2022_lme, type="marginal")
-  performance::r2(fk_anpp_2022_lme) # Marginal R2 considers only the variance of the fixed effects, which is what I want
+  performance::r2(fk_live_root_quadratic_2022_lme) # Marginal R2 considers only the variance of the fixed effects, which is what I want
 
   fk_live_root_2022_coeff <- fk_live_root_quadratic_2022_lme$coefficients$fixed
   xhat <- 0:99
@@ -758,6 +759,63 @@ ggsave(paste0(figure_dir, "\\som figure_",Sys.Date(),".png"),width=9, height=4.2
 
 }
 
+###
+### Running models with drought and grazing in 2020 and 2021 to test for herbivory mechanism
+###
+
+## Live root
+# 2020 FK
+fk_live_root_2020_lme <- lme(lnrr_live_root ~ Drought*Grazing
+                        , data=filter(stcrop_rr, year==2020 & site=="FK")
+                        , random = ~1 |block/Paddock
+                        , na.action = na.omit)
+anova.lme(fk_live_root_2020_lme, type="marginal") # no grazing * Drought interaction
+# 2021 FK
+fk_live_root_2021_lme <- lme(lnrr_live_root ~ Drought*Grazing
+                             , data=filter(stcrop_rr, year==2021 & site=="FK")
+                             , random = ~1 |block/Paddock
+                             , na.action = na.omit)
+anova.lme(fk_live_root_2021_lme, type="marginal") # no grazing * Drought interaction
+
+# 2020 TB
+tb_live_root_2020_lme <- lme(lnrr_live_root ~ Drought*Grazing
+                             , data=filter(stcrop_rr, year==2020 & site=="TB")
+                             , random = ~1 |block/Paddock
+                             , na.action = na.omit)
+anova.lme(tb_live_root_2020_lme, type="marginal") # no grazing * Drought interaction
+# 2021 TB
+tb_live_root_2021_lme <- lme(lnrr_live_root ~ Drought*Grazing
+                             , data=filter(stcrop_rr, year==2021 & site=="TB")
+                             , random = ~1 |block/Paddock
+                             , na.action = na.omit)
+anova.lme(tb_live_root_2021_lme, type="marginal") # no grazing * Drought interaction
+
+## Dead root + SOM
+# 2020 FK
+fk_som_2020_lme <- lme(lnrr_som ~ Drought*Grazing
+                             , data=filter(stcrop_rr, year==2020 & site=="FK")
+                             , random = ~1 |block/Paddock
+                             , na.action = na.omit)
+anova.lme(fk_som_2020_lme, type="marginal") # no grazing * Drought interaction
+# 2021 FK
+fk_som_2021_lme <- lme(lnrr_som ~ Drought*Grazing
+                             , data=filter(stcrop_rr, year==2021 & site=="FK")
+                             , random = ~1 |block/Paddock
+                             , na.action = na.omit)
+anova.lme(fk_som_2021_lme, type="marginal") # no grazing * Drought interaction
+
+# 2020 TB
+tb_som_2020_lme <- lme(lnrr_som ~ Drought*Grazing
+                             , data=filter(stcrop_rr, year==2020 & site=="TB")
+                             , random = ~1 |block/Paddock
+                             , na.action = na.omit)
+anova.lme(tb_som_2020_lme, type="marginal") # no grazing * Drought interaction
+# 2021 TB
+tb_som_2021_lme <- lme(lnrr_som ~ Drought*Grazing
+                             , data=filter(stcrop_rr, year==2021 & site=="TB")
+                             , random = ~1 |block/Paddock
+                             , na.action = na.omit)
+anova.lme(tb_som_2021_lme, type="marginal") # no grazing * Drought interaction
 
 ###
 ### Extra code below

@@ -700,6 +700,14 @@ test(emtrends(fk_c3p_diff_model_full, "Year", var="Drought"))
 # emmeans(fk_anpp_model_full, "Grazing", by="Year")
 # pairs(emmeans(fk_anpp_model_full, "Grazing", by="Year")) ## Nothing comes out in the multiple comparison
 
+## check if 2020 slope has an intercept that is different than 0 (for writing results)
+fk_c3p_diff_model_2020 <-lme(diff_anpp ~ Drought
+                             , data=filter(anpp_fxn_rr, Year %in% 2020 & Site=="FK" & fxn_type=="C3P_gm2")
+                             , random = ~1 |Block/Paddock
+                             , na.action = na.omit)
+anova.lme(fk_c3p_diff_model_2020, type="marginal")
+summary(fk_c3p_diff_model_2020)
+
 # Save to writable tables
 fk_c3p_diff_anova_df <- data.frame(effect=row.names(fk_c3p_diff_anova), fk_c3p_diff_anova, fxn_type="C3P", site="FK")
 fk_c3p_diff_emtrends <- data.frame(test(emtrends(fk_c3p_diff_model_full, "Year", var="Drought")), fxn_type="C3P", site="FK")
