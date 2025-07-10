@@ -588,4 +588,114 @@ dev.off()
 
 }
 
+###
+### Calculating monthly distributions for FK and plotting recovery monthly precip years 2021-2023 on there 
+###
+{
 
+  ###
+  ### Calculate probabilty curves
+  
+  fk_monthly_stats <- fk_monthly %>%
+  group_by(MONTH) %>%
+  summarize(mean_ppt = mean(PRCP,na.rm=T),
+            sd_ppt = sd(PRCP, na.rm=T)) %>%
+  rename(month=MONTH) %>%
+  mutate(date=as.Date(paste(1900, month, "01", sep="-"))) %>%
+    mutate(month_char=month(date, label=T, abbr=T))
+  
+fk_monthly_dnorm_master <- {}
+
+for(MONTH in 1:nrow(fk_monthly_stats)){
+  fk_monthly_dnorm_temp <- data.frame(
+                                month=MONTH,  
+                                prcp_hat = seq(0,300,1),
+                                 probability = dnorm(seq(0,300,1), mean=filter(fk_monthly_stats,month==MONTH)$mean_ppt,
+                                                     sd=filter(fk_monthly_stats,month==MONTH)$sd_ppt)
+  )
+fk_monthly_dnorm_master <- rbind(fk_monthly_dnorm_master, fk_monthly_dnorm_temp)
+rm(fk_monthly_dnorm_temp)
+  
+}
+
+fk_monthly_dnorm <- fk_monthly_dnorm_master %>%
+  mutate(date=as.Date(paste(1999, month, "01", sep="-"))) %>%
+  mutate(month_char=month(date, label=T, abbr=T))
+  #mutate(month_char=c("Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"))
+
+#fk_monthly_dnorm$month_char <- factor(fk_monthly_dnorm$month_char, levels=c("Aug","Sep","Oct","Nov","Dec","Jan","Feb","Mar","Apr","May","Jun","Jul"))
+fk_monthly_dnorm$month_char <- factor(fk_monthly_dnorm$month_char, levels=c("Jul","Jun","May","Apr","Mar","Feb","Jan","Dec","Nov","Oct","Sep","Aug"))
+
+##
+## prepare monthly treatment data for plotting on top of curves
+fk_99_monthly_ppt <- fk_trt_monthly_ppt %>%
+  mutate(month_char=month(DATE, label=T, abbr=T)) %>%
+  mutate(rain_year = ifelse(month>=8,year+1,year)) %>%
+  filter(rain_year %in% 2021:2023 & Drought==99) %>%
+  mutate(custom_month = rep(1:12,3))
+
+fk_99_monthly_ppt$month_char <- factor(fk_99_monthly_ppt$month_char, levels=c("Aug","Sep","Oct","Nov","Dec","Jan","Feb","Mar","Apr","May","Jun","Jul"))
+fk_monthly_stats$month_char <- factor(fk_monthly_stats$month_char, levels=c("Aug","Sep","Oct","Nov","Dec","Jan","Feb","Mar","Apr","May","Jun","Jul"))
+
+
+ggplot(fk_monthly_dnorm, aes(x=prcp_hat, y=month_char, height=probability*50, group=month_char)) +
+  geom_ridgeline(min_height=0.01, alpha=0.3) +
+  xlim(0,150) +
+  geom_point(data=fk_99_monthly_ppt, inherit.aes=F, aes(ppt_trt, month_char, shape=as.factor(rain_year), fill=as.factor(rain_year)), col="black", size=3) +
+  geom_path(data=fk_99_monthly_ppt, inherit.aes=F, aes(ppt_trt, custom_month, linetype = as.factor(rain_year)), col="black") +
+  scale_shape_manual(values=c(21:23)) +
+  scale_fill_manual(values=c("lightgreen","green","darkgreen")) +
+  theme_few()
+
+ppt_month_plot <- ggplot(fk_99_monthly_ppt, aes(x=month_char, y=ppt_trt, shape=as.factor(rain_year), fill=as.factor(rain_year))) +
+                geom_col(position=position_dodge(), col="black") +
+              #  geom_path(data=fk_99_monthly_ppt, inherit.aes=F, aes(custom_month, ppt_trt, linetype = as.factor(rain_year)), col="black") +
+              #  scale_shape_manual(values=c(21:23)) +
+              #  scale_fill_manual(values=c("#A6CEE3", "#1F78B4", "#08306B")) + # Blues
+              #  scale_fill_manual(values=c("#66C2A5", "#4393C3", "#2166AC")) + # Blue-greens
+              #  scale_fill_manual(values=brewer.pal(3, "Blues")) + # blues
+                scale_fill_manual(values=brewer.pal(3, "Greens")) + # greens
+                geom_point(data=fk_monthly_stats, inherit.aes=F, aes(month_char, mean_ppt), pch=18, alpha=0.7, size=3) +
+                labs(x="Month", y="Monthly precipitation (mm)", fill="Rain-year") +
+                theme_few() +
+                theme(axis.text=element_text(size=13),
+                      text=element_text(size=14))
+
+pdf(file="..\\..\\npp_manuscript\\figures\\ppt by month_fk_2021-2023.pdf", width=9, height=3.5, useDingbats=F)
+print(ppt_month_plot)
+dev.off()
+
+
+###
+### Try plotting cumulative ppt over rain year
+
+month_days <- data.frame(
+  water_day = cumsum(c(15, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30)),
+  label = c("Aug", "Sep", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar", 
+            "Apr", "May", "Jun", "Jul")
+)
+
+fk_99_ppt_cum <- fk_trt_ppt %>%
+  filter(Drought==99) %>%
+  mutate(rain_year = ifelse(month>=8,year+1,year)) %>%
+  group_by(rain_year) %>%
+  mutate(DATE = as.Date(paste(year, month, day, sep="-"))) %>%
+  arrange(rain_year, DATE) %>%
+  mutate(cum_precip = cumsum(ppt_trt)) %>%
+  ungroup() %>%
+  mutate(doy_custom = c(154:365,1:365,1:365,1:366,1:365,1:365,1:365,1:153))
+  
+cum_ppt_plot <- ggplot(filter(fk_99_ppt_cum,rain_year %in% 2021:2023 & Drought==99), aes(x=doy_custom, y=cum_precip, col=as.factor(rain_year))) +
+                  geom_path(size=1) +
+                  scale_x_continuous(breaks = month_days$water_day, labels = month_days$label) +
+                  scale_colour_manual(values=brewer.pal(6, "Greens")[c(3,5,6)]) + # greens
+                  labs(x="Month", y="Cumulative precipitation (mm)", color="Rain-year") +
+                  theme_few() +
+                  theme(axis.text=element_text(size=13),
+                        text=element_text(size=14))
+
+pdf(file="..\\..\\npp_manuscript\\figures\\cumulative ppt_fk_2021-2023.pdf", width=9, height=3.5, useDingbats=F)
+print(cum_ppt_plot)
+dev.off()
+
+}
