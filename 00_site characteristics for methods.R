@@ -9,10 +9,10 @@ library(tidyverse)
 setwd("C:\\Users\\K_WILCOX\\OneDrive - UNCG\\Current projects\\GMDR\\data\\")
 
 ### Read in plot keys from Sally's script "cleaning fk and tb ppt data_v2.R"
-PlotKey_FK<-read.csv("..//Plot_Treatment_Key_020424.csv") %>% 
+PlotKey_FK<-read.csv("Plot_Treatment_Key_020424.csv") %>% 
   filter(site=="FK") %>% 
   mutate(RainAmount=100-rainfall_reduction)
-PlotKey_TB<-read.csv("..//Plot_Treatment_Key_020424.csv") %>% 
+PlotKey_TB<-read.csv("Plot_Treatment_Key_020424.csv") %>% 
   filter(site=="TB") %>% 
   mutate(RainAmount=100-rainfall_reduction)
 
@@ -87,7 +87,7 @@ fk_soil_texture_block_means <- fk_soil_texture_df %>%
   min(tb_annual$TMIN)
   ggplot(tb_annual, aes(as.factor(MONTH), PRCP))+ geom_col()
   min(tb_annual$TMIN)
-  
+ 
   fk_daymet <- read.csv("FK_Daymet_1980-2023.csv", skip=6) %>%
     dplyr::select(year, yday, prcp..mm.day.,tmax..deg.c.,tmin..deg.c.) %>%
     rename(YEAR=year, DOY=yday, PRCP=prcp..mm.day., TMAX=tmax..deg.c., TMIN=tmin..deg.c.) %>%
