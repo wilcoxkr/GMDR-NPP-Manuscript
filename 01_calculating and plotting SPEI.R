@@ -13,6 +13,7 @@ library(SPEI)
 library(ggnewscale)
 library(ggfortify)
 library(ggridges)
+library(RColorBrewer)
 rm(list=ls()) # clean up
 
 # Set working directory
@@ -596,13 +597,23 @@ dev.off()
   ###
   ### Calculate probabilty curves
   
+  rain_yr_month_key <- data.frame(
+    month_char=c("Aug","Sep", "Oct","Nov","Dec","Jan","Feb","Mar","Apr","May","Jun","Jul"),
+    month_custom=1:12,
+    doy_counter=c(15.5, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31)
+  )
+  rain_yr_month_key$doy_custom <- cumsum(rain_yr_month_key$doy_counter)
+  
   fk_monthly_stats <- fk_monthly %>%
   group_by(MONTH) %>%
   summarize(mean_ppt = mean(PRCP,na.rm=T),
             sd_ppt = sd(PRCP, na.rm=T)) %>%
   rename(month=MONTH) %>%
   mutate(date=as.Date(paste(1900, month, "01", sep="-"))) %>%
-    mutate(month_char=month(date, label=T, abbr=T))
+    mutate(month_char=month(date, label=T, abbr=T)) %>%
+  full_join(rain_yr_month_key, by="month_char") %>%
+  arrange(month_custom) %>%
+  mutate(cum_ppt=cumsum(mean_ppt))
   
 fk_monthly_dnorm_master <- {}
 
@@ -636,7 +647,8 @@ fk_99_monthly_ppt <- fk_trt_monthly_ppt %>%
 
 fk_99_monthly_ppt$month_char <- factor(fk_99_monthly_ppt$month_char, levels=c("Aug","Sep","Oct","Nov","Dec","Jan","Feb","Mar","Apr","May","Jun","Jul"))
 fk_monthly_stats$month_char <- factor(fk_monthly_stats$month_char, levels=c("Aug","Sep","Oct","Nov","Dec","Jan","Feb","Mar","Apr","May","Jun","Jul"))
-
+fk_monthly_stats$month_doy <- c(15.5, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31)
+fk_monthly_stats$doy_custom <- c(168.5, 198, 227.5, 258, 288.5, 319, 349.5, 15.5, 46, 76.5, 107, 137.5)
 
 ggplot(fk_monthly_dnorm, aes(x=prcp_hat, y=month_char, height=probability*50, group=month_char)) +
   geom_ridgeline(min_height=0.01, alpha=0.3) +
@@ -686,15 +698,18 @@ fk_99_ppt_cum <- fk_trt_ppt %>%
   mutate(doy_custom = c(154:365,1:365,1:365,1:366,1:365,1:365,1:365,1:153))
   
 cum_ppt_plot <- ggplot(filter(fk_99_ppt_cum,rain_year %in% 2021:2023 & Drought==99), aes(x=doy_custom, y=cum_precip, col=as.factor(rain_year))) +
+                  geom_point(inherit.aes=F, data=fk_monthly_stats, aes(x=doy_custom, y=cum_ppt), col="grey50", size=3) +
                   geom_path(size=1) +
                   scale_x_continuous(breaks = month_days$water_day, labels = month_days$label) +
                   scale_colour_manual(values=brewer.pal(6, "Greens")[c(3,5,6)]) + # greens
+#                  geom_errorbar(inherit.aes=F, data=fk_monthly_stats, aes(x=doy_custom, y=cum_ppt, ymin=cum_ppt-sd_ppt, ymax=cum_ppt+sd_ppt)) +
                   labs(x="Month", y="Cumulative precipitation (mm)", color="Rain-year") +
                   theme_few() +
-                  theme(axis.text=element_text(size=13),
-                        text=element_text(size=14))
+                  theme(axis.text=element_text(size=8),
+                        text=element_text(size=9),
+                        axis.text.x = element_text(size=9, angle=45, hjust=1))
 
-pdf(file="..\\..\\npp_manuscript\\figures\\cumulative ppt_fk_2021-2023.pdf", width=9, height=3.5, useDingbats=F)
+pdf(file="..\\..\\npp_manuscript\\figures\\cumulative ppt_fk_2021-2023.pdf", width=4, height=3.15, useDingbats=F)
 print(cum_ppt_plot)
 dev.off()
 

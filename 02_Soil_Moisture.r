@@ -157,6 +157,7 @@ smoist_all <- smoist_all_temp %>%
   dplyr::select(-drought) %>%
   rename(Plot=PlotID, Grazing=grazing_category, Drought=rainfall_reduction, Block=block, Paddock=paddock)
 
+write.csv(smoist_all, "smoist_bothSites_allYears.csv", row.names=F)
 
 ### Check that we have the correct number of measurements for all dates and years -- looks good
 with(smoist_all, table(DOY2, Year, Site))

@@ -1,7 +1,7 @@
 ### Cleaning plotting and analysis -- ANPP data
 ###
 ### Author: Kevin Wilcox (k_wilcox@uncg.edu)
-### Created January 25, 2022; Last updated May 5, 2025
+### Created January 25, 2022; Last updated May 11, 2026
 
 ### Set up workspace
 library(tidyverse)
@@ -343,7 +343,7 @@ npp_master <- totnpp_tb_plot_means %>%
   pivot_longer(cols=ANPP:totNPP, names_to="npp_type", values_to="npp_gm2")
 
 write.csv(npp_master, file=paste0(write_dir,"data_sets\\ANPP BNPP total NPP_plot level_cleaned and processed from R",Sys.Date(),".csv"), row.names=F)
-
+npp_master <- read.csv(paste0(write_dir,"data_sets\\ANPP BNPP total NPP_plot level_cleaned and processed from R2025-07-09.csv"))
 
 }
 
@@ -426,7 +426,7 @@ write.csv(npp_master, file=paste0(write_dir,"data_sets\\ANPP BNPP total NPP_plot
   anova.lme(fk_anpp_2023_lme, type="marginal")
   performance::r2(fk_anpp_2023_lme) # Marginal R2 considers only the variance of the fixed effects, which is what I want
   
-
+ 
   ### Thunder Basin
   ###
   
@@ -566,6 +566,63 @@ write.csv(npp_master, file=paste0(write_dir,"data_sets\\ANPP BNPP total NPP_plot
 }
  
 ###
+### Testing GAMMs 
+###
+{
+  
+  ###
+  ### Create the model
+
+  npp_rr$BlockPaddock <- interaction(npp_rr$Block, npp_rr$Paddock)
+  dat=subset(npp_rr, Year==2021 & Site=="TB" & npp_type=="ANPP")
+  gamm_mod_test <- gamm(lnrr_npp~s(Drought,k=4),
+                        data=dat,
+                        random = list(
+                          Block = ~1,
+                          BlockPaddock = ~1
+                        ))
+  
+  ###
+  ### Create predicted values and 95% confidence envelope
+  x_hat <- data.frame(
+    Drought=seq(25,99,by=.1)
+  )
+  
+  tb_21_anpp_hat <- predict(
+    gamm_mod_test$gam,
+    newdata = x_hat,
+    se.fit = TRUE
+  )
+
+    temp<-tb_21_anpp_hat
+  # converting to data frame
+  tb_21_anpp_hat$Drought <- x_hat$Drought
+  tb_21_anpp_hat$fit <- temp$fit
+  tb_21_anpp_hat$se  <- temp$se.fit
+  
+  tb_21_anpp_hat$upper <- tb_21_anpp_hat$fit + 1.96 * tb_21_anpp_hat$se
+  tb_21_anpp_hat$lower <- tb_21_anpp_hat$fit - 1.96 * tb_21_anpp_hat$se
+  
+  tb_21_anpp_hat <- as.data.frame(tb_21_anpp_hat)
+  ###
+  ### Plotting GAMM output
+  
+ 
+  
+  ggplot(filter(npp_rr,Year==2021 & npp_type == "ANPP" & Site=="TB"), 
+         aes(x=Drought, y=lnrr_npp))+
+    geom_hline(yintercept=0, col="darkgrey") +
+    geom_ribbon(data = tb_21_anpp_hat,aes(x=Drought, ymin = lower, ymax = upper), fill="springgreen3", alpha = 0.2,inherit.aes = FALSE) +
+    geom_line(data = tb_21_anpp_hat, aes(x=Drought, y = fit),linewidth = 1,inherit.aes = FALSE, col="springgreen3") +
+    geom_jitter(col="grey", width=1) +
+    geom_point(data=filter(npp_rr_drought_means,Year==2021 & npp_type =="ANPP" & Site=="TB"),
+               aes(x=Drought, y=npp_mean), size=3, col="black", inherit.aes=F, ) +
+    xlab("Rainfall reduction (%)") + ylab("Net primary productivity (g/m2)") +
+    theme_few()
+  
+}
+
+###
 ### Run models and testing for normality - Raw data
 ###
 {
@@ -688,6 +745,10 @@ write.csv(npp_master, file=paste0(write_dir,"data_sets\\ANPP BNPP total NPP_plot
   hist(log(filter(npp_master, Year %in% 2019:2023 & Site=="FK" & npp_type=="BNPP")$npp_gm2))
   
   ## NO SIGNIFICANT INTERACTIONS SO STOP HERE
+  # but here are emtrends for Fig. S4 raw BNPP across drought treatments
+  emtrends(fk_bnpp_raw_model_full, "Year", var="Drought")
+  test(emtrends(fk_bnpp_raw_model_full, "Year", var="Drought"))
+  
   
   # Save to writable tables
   fk_bnpp_raw_anova_df <- data.frame(effect=row.names(fk_bnpp_raw_anova), fk_bnpp_raw_anova, site="FK")
@@ -720,6 +781,103 @@ write.csv(npp_master, file=paste0(write_dir,"data_sets\\ANPP BNPP total NPP_plot
   ### Write tables of model output for both sites
   anova_bnpp_raw_df <- tb_bnpp_raw_anova_df %>% bind_rows(fk_bnpp_raw_anova_df)
   write.csv(anova_bnpp_raw_df, file=paste0(write_dir,"tables\\bnpp raw lme ANCOVA output_both sites",Sys.Date(),".csv"), row.names=F)
+}
+
+###
+### non-linear patterns of BNPP
+###
+{
+  npp_master <- npp_master %>% mutate(Drought2=Drought^2)
+  ## Fort Keogh
+  # 2019 - n.s.
+  fk_bnpp_quadratic_2019_lme <- lme(npp_gm2 ~ Drought+Drought2
+                                         , data=filter(npp_master, Year == 2019 & Site=="FK" & npp_type=="BNPP")
+                                         , random = ~1 |Block/Paddock
+                                         , na.action = na.omit)
+  anova.lme(fk_bnpp_quadratic_2019_lme, type="marginal")
+  performance::r2(fk_bnpp_quadratic_2019_lme) # Marginal R2 considers only the variance of the fixed effects, which is what I want
+  # 2020 - SIGNIFICANT
+  fk_bnpp_quadratic_2020_lme <- lme(npp_gm2 ~ Drought+Drought2
+                                    , data=filter(npp_master, Year == 2020 & Site=="FK" & npp_type=="BNPP")
+                                    , random = ~1 |Block/Paddock
+                                    , na.action = na.omit)
+  anova.lme(fk_bnpp_quadratic_2020_lme, type="marginal")
+  performance::r2(fk_bnpp_quadratic_2020_lme) # Marginal R2 considers only the variance of the fixed effects, which is what I want
+  # 2021 - n.s.
+  fk_bnpp_quadratic_2021_lme <- lme(npp_gm2 ~ Drought+Drought2
+                                    , data=filter(npp_master, Year == 2021 & Site=="FK" & npp_type=="BNPP")
+                                    , random = ~1 |Block/Paddock
+                                    , na.action = na.omit)
+  anova.lme(fk_bnpp_quadratic_2021_lme, type="marginal")
+  performance::r2(fk_bnpp_quadratic_2021_lme) # Marginal R2 considers only the variance of the fixed effects, which is what I want
+   # 2022 - n.s.
+  fk_bnpp_quadratic_2022_lme <- lme(npp_gm2 ~ Drought+Drought2
+                                    , data=filter(npp_master, Year == 2022 & Site=="FK" & npp_type=="BNPP")
+                                    , random = ~1 |Block/Paddock
+                                    , na.action = na.omit)
+  anova.lme(fk_bnpp_quadratic_2022_lme, type="marginal")
+  performance::r2(fk_bnpp_quadratic_2022_lme) # Marginal R2 considers only the variance of the fixed effects, which is what I want
+  
+  ## Thunder basin
+  # 2019 - n.s.
+  tb_bnpp_quadratic_2019_lme <- lme(npp_gm2 ~ Drought+Drought2
+                                    , data=filter(npp_master, Year == 2019 & Site=="TB" & npp_type=="BNPP")
+                                    , random = ~1 |Block/Paddock
+                                    , na.action = na.omit)
+  anova.lme(tb_bnpp_quadratic_2019_lme, type="marginal")
+  performance::r2(tb_bnpp_quadratic_2019_lme) # Marginal R2 considers only the variance of the fixed effects, which is what I want
+  # 2020 - SIGNIFICANT DROUGHT EFFECT BUT NOT DROUGHT^2
+  tb_bnpp_quadratic_2020_lme <- lme(npp_gm2 ~ Drought+Drought2
+                                    , data=filter(npp_master, Year == 2020 & Site=="TB" & npp_type=="BNPP")
+                                    , random = ~1 |Block/Paddock
+                                    , na.action = na.omit)
+  anova.lme(tb_bnpp_quadratic_2020_lme, type="marginal")
+  performance::r2(tb_bnpp_quadratic_2020_lme) # Marginal R2 considers only the variance of the fixed effects, which is what I want
+  
+  # because Drought2 not significant, run linear model
+  tb_bnpp_linear_2020_lme <- lme(npp_gm2 ~ Drought
+                                    , data=filter(npp_master, Year == 2020 & Site=="TB" & npp_type=="BNPP")
+                                    , random = ~1 |Block/Paddock
+                                    , na.action = na.omit)
+  anova.lme(tb_bnpp_linear_2020_lme, type="marginal")
+  performance::r2(tb_bnpp_linear_2020_lme) # Marginal R2 considers only the variance of the fixed effects, which is what I want
+  
+  # 2021 - n.s.
+  tb_bnpp_quadratic_2021_lme <- lme(npp_gm2 ~ Drought+Drought2
+                                    , data=filter(npp_master, Year == 2021 & Site=="TB" & npp_type=="BNPP")
+                                    , random = ~1 |Block/Paddock
+                                    , na.action = na.omit)
+  anova.lme(tb_bnpp_quadratic_2021_lme, type="marginal")
+  performance::r2(tb_bnpp_quadratic_2021_lme) # Marginal R2 considers only the variance of the fixed effects, which is what I want
+  # 2022 - n.s.
+  tb_bnpp_quadratic_2022_lme <- lme(npp_gm2 ~ Drought+Drought2
+                                    , data=filter(npp_master, Year == 2022 & Site=="TB" & npp_type=="BNPP")
+                                    , random = ~1 |Block/Paddock
+                                    , na.action = na.omit)
+  anova.lme(tb_bnpp_quadratic_2022_lme, type="marginal")
+  performance::r2(tb_bnpp_quadratic_2022_lme) # Marginal R2 considers only the variance of the fixed effects, which is what I want
+  
+  
+  ### Create trendline object for plotting
+  fk_bnpp_2020_coeff <- fk_bnpp_quadratic_2020_lme$coefficients$fixed
+  xhat <- 0:99
+  fk_bnpp_2020_yhat <- fk_bnpp_2020_coeff[1] + fk_bnpp_2020_coeff[2]*xhat + fk_bnpp_2020_coeff[3]*xhat^2
+  
+  tb_bnpp_2020_coeff <- tb_bnpp_linear_2020_lme$coefficients$fixed
+  tb_bnpp_2020_yhat <- tb_bnpp_2020_coeff[1] + tb_bnpp_2020_coeff[2]*xhat
+  
+  # Create trendline data frame
+  bnpp_nonlinear_trendlines <- data.frame(xhat=NA, yhat=NA, Site="FK",Year="2019") %>%
+    bind_rows(
+              data.frame(xhat, yhat= fk_bnpp_2020_yhat, Site="FK",Year="2020"),
+              data.frame(xhat=NA, yhat=NA, Site="FK",Year="2021"),
+              data.frame(xhat=NA, yhat=NA, Site="FK",Year="2022"),
+              data.frame(xhat=NA, yhat=NA, Site="TB",Year="2019"),
+              data.frame(xhat, yhat=tb_bnpp_2020_yhat, Site="TB",Year="2020"),
+              data.frame(xhat=NA, yhat=NA, Site="TB",Year="2021"),
+              data.frame(xhat=NA, yhat=NA, Site="TB",Year="2022")
+              )              
+  
 }
 
 ###
@@ -812,6 +970,95 @@ write.csv(npp_master, file=paste0(write_dir,"data_sets\\ANPP BNPP total NPP_plot
 
 }
 
+### 
+### Checking whether geom_smooth matches predictions from our repeated measures model.. and geom_smooth CI look identical to output from ggpredict
+###
+{
+### create a model with just drought to calculate predictions and CIs for trendlines, stitch them together 
+
+tb_anpp_model_drt <- lme(lnrr_npp ~ as.factor(Year)*Drought
+                          , data=filter(npp_rr, Year %in% 2019:2023 & Site=="TB" & npp_type=="ANPP")
+                          , random = ~1 |Block/Paddock
+                          , correlation=corAR1(form = ~1 |Block/Paddock/Plot)
+                          , control=lmeControl(returnObject=TRUE)
+                          , na.action = na.omit)
+
+
+tb_anpp_preds <- ggpredict(
+  tb_anpp_model_drt,
+  terms = c("Drought [25:99 by=1]", "Year")) 
+
+tb_anpp_preds_df <- as.data.frame(tb_anpp_preds) %>%
+  mutate(Site="TB",
+         npp_type="ANPP") %>%
+  rename(Year=group)
+
+tb_bnpp_model_drt <- lme(lnrr_npp ~ as.factor(Year)*Drought
+                         , data=filter(npp_rr, Year %in% 2019:2023 & Site=="TB" & npp_type=="BNPP")
+                         , random = ~1 |Block/Paddock
+                         , correlation=corAR1(form = ~1 |Block/Paddock/Plot)
+                         , control=lmeControl(returnObject=TRUE)
+                         , na.action = na.omit)
+
+
+tb_bnpp_preds <- ggpredict(
+  tb_bnpp_model_drt,
+  terms = c("Drought [25:99 by=1]", "Year")) 
+
+tb_bnpp_preds_df <- as.data.frame(tb_bnpp_preds) %>%
+  mutate(Site="TB",
+         npp_type="BNPP") %>%
+  rename(Year=group)
+
+fk_anpp_model_drt <- lme(lnrr_npp ~ as.factor(Year)*Drought
+                         , data=filter(npp_rr, Year %in% 2019:2023 & Site=="FK" & npp_type=="ANPP")
+                         , random = ~1 |Block/Paddock
+                         , correlation=corAR1(form = ~1 |Block/Paddock/Plot)
+                         , control=lmeControl(returnObject=TRUE)
+                         , na.action = na.omit)
+
+
+fk_anpp_preds <- ggpredict(
+  fk_anpp_model_drt,
+  terms = c("Drought [25:99 by=1]", "Year")) 
+
+fk_anpp_preds_df <- as.data.frame(fk_anpp_preds) %>%
+  mutate(Site="FK",
+         npp_type="ANPP") %>%
+  rename(Year=group)
+
+fk_bnpp_model_drt <- lme(lnrr_npp ~ as.factor(Year)*Drought
+                         , data=filter(npp_rr, Year %in% 2019:2023 & Site=="FK" & npp_type=="BNPP")
+                         , random = ~1 |Block/Paddock
+                         , correlation=corAR1(form = ~1 |Block/Paddock/Plot)
+                         , control=lmeControl(returnObject=TRUE)
+                         , na.action = na.omit)
+
+
+fk_bnpp_preds <- ggpredict(
+  fk_bnpp_model_drt,
+  terms = c("Drought [25:99 by=1]", "Year")) 
+
+fk_bnpp_preds_df <- as.data.frame(fk_bnpp_preds) %>%
+  mutate(Site="FK",
+         npp_type="BNPP") %>%
+  rename(Year=group)
+
+npp_preds_df <- bind_rows(tb_anpp_preds_df, tb_bnpp_preds_df,fk_anpp_preds_df, fk_bnpp_preds_df)
+
+ggplot(filter(npp_rr,Year%in%2019:2023 & npp_type %in% c("ANPP","BNPP")), 
+                  aes(x=Drought, y=lnrr_npp, fill=npp_type, shape=npp_type, col=npp_type))+
+  scale_shape_manual(values=c(21,24))+
+  scale_fill_manual(values=c("springgreen3","saddlebrown")) +
+  scale_color_manual(values=c("springgreen3","saddlebrown")) +
+  geom_hline(yintercept=0, col="grey") +
+  geom_ribbon(data = npp_preds_df,aes(x=x, ymin = conf.low, ymax = conf.high, fill=npp_type), alpha = 0.2,inherit.aes = FALSE) +
+  geom_line(data = npp_preds_df, aes(x=x, y = predicted, col=npp_type),linewidth = 1,inherit.aes = FALSE) +
+  geom_jitter(width=1, alpha=.6) +
+  facet_grid(Site~Year) +
+  xlab("Rainfall reduction (%)") + ylab("Net primary productivity (g/m2)") +
+  theme_few()
+}
 
 ###
 ### Plotting raw ANPP and BNPP by drought
@@ -845,7 +1092,8 @@ bnpp_raw_fig <- ggplot(filter(npp_drt_means,Year %in%2019:2023 & npp_type == "BN
                        aes(x=Drought, y=npp_mean, ymin=npp_mean-npp_se, ymax=npp_mean+npp_se)) +
   geom_errorbar(width=1) +
   geom_point() +
-  geom_smooth(method="lm",se=F) +
+  geom_line(inherit.aes=F, data=bnpp_nonlinear_trendlines, aes(x=xhat, y=yhat)) + # see section: non-linear patterns of BNPP for creation of this data frame
+#  geom_smooth(method="lm",se=F) +
   facet_grid(Site~Year, scales="free_y") +
   ylab("BNPP g/m2") + xlab("Rainfall reduction (%)") +
   theme_few()

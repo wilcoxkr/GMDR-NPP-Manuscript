@@ -682,12 +682,24 @@ ggplot(filter(anpp_fxn_grps, fxn_type=="Forb_gm2"&Year==2023&Site=="FK"), aes(x=
 ### Fort Keogh
 ###
 
+  fk_fxn_diff_model_full <- lme(diff_anpp ~ as.factor(Year)*Drought*fxn_type+as.factor(Year)*Grazing*fxn_type+Grazing*Drought*fxn_type
+                                , data=filter(anpp_fxn_rr, Year %in% 2019:2023 & Site=="FK")
+                                , random = ~1 |Block/Paddock/Plot
+                                , correlation=corCompSymm(form = ~1 |Block/Paddock/Plot)
+                                , control=lmeControl(returnObject=TRUE)
+                                , na.action = na.omit)
+  fk_fxn_diff_anova <- anova.lme(fk_fxn_diff_model_full, type="marginal")
+  plot(fk_fxn_diff_model_full, type=c("p","smooth"), col.line=1)
+  qqnorm(fk_fxn_diff_model_full, abline = c(0,1)) ## qqplot
+  hist(filter(anpp_fxn_rr, Year %in% 2019:2023 & Site=="FK")$diff_anpp)
+  
+  
 ## c3p
 ##
 fk_c3p_diff_model_full <- lme(diff_anpp ~ as.factor(Year)*Drought+as.factor(Year)*Grazing+Drought*Grazing
                          , data=filter(anpp_fxn_rr, Year %in% 2019:2023 & Site=="FK" & fxn_type=="C3P_gm2")
                          , random = ~1 |Block/Paddock/Plot
-                         , correlation=corAR1(form = ~1 |Block/Paddock/Plot)
+                         , correlation=corCompSymm(form = ~1 |Block/Paddock/Plot)
                          , control=lmeControl(returnObject=TRUE)
                          , na.action = na.omit)
 fk_c3p_diff_anova <- anova.lme(fk_c3p_diff_model_full, type="marginal")
@@ -695,10 +707,31 @@ plot(fk_c3p_diff_model_full, type=c("p","smooth"), col.line=1)
 qqnorm(fk_c3p_diff_model_full, abline = c(0,1)) ## qqplot
 hist(filter(anpp_fxn_rr, Year %in% 2019:2023 & Site=="FK" & fxn_type=="C3P_gm2")$diff_anpp)
 
+summary(fk_c3p_diff_model_full)
+emmeans(fk_c3p_diff_model_full, "Year")
 emtrends(fk_c3p_diff_model_full, "Year", var="Drought")
 test(emtrends(fk_c3p_diff_model_full, "Year", var="Drought"))
 # emmeans(fk_anpp_model_full, "Grazing", by="Year")
-# pairs(emmeans(fk_anpp_model_full, "Grazing", by="Year")) ## Nothing comes out in the multiple comparison
+
+# Does removing grazing improve the drought by year interaction?
+fk_c3p_diff_model_HGonly <- lme(diff_anpp ~ as.factor(Year)*Drought
+                              , data=filter(anpp_fxn_rr, Year %in% 2019:2023 & Site=="FK" & fxn_type=="C3P_gm2" & Grazing=="HHMMM")
+                              , random = ~1 |Block/Paddock/Plot
+                              , correlation=corCompSymm(form = ~1 |Block/Paddock/Plot)
+                              , control=lmeControl(returnObject=TRUE)
+                              , na.action = na.omit)
+fk_c3p_diff_anova <- anova.lme(fk_c3p_diff_model_HGonly, type="marginal")
+plot(fk_c3p_diff_model_full, type=c("p","smooth"), col.line=1)
+qqnorm(fk_c3p_diff_model_full, abline = c(0,1)) ## qqplot
+hist(filter(anpp_fxn_rr, Year %in% 2019:2023 & Site=="FK" & fxn_type=="C3P_gm2")$diff_anpp)
+
+summary(fk_c3p_diff_model_full)
+emmeans(fk_c3p_diff_model_full, "Year")
+emtrends(fk_c3p_diff_model_full, "Year", var="Drought")
+test(emtrends(fk_c3p_diff_model_full, "Year", var="Drought"))
+
+
+pairs(emmeans(fk_c3p_diff_model_full, "Grazing", by="Year")) 
 
 ## check if 2020 slope has an intercept that is different than 0 (for writing results)
 fk_c3p_diff_model_2020 <-lme(diff_anpp ~ Drought
@@ -851,6 +884,17 @@ performance::r2(fk_annualgrass_diff_2023_lme) # CAN'T HAVE PLOT IN RANDOM STATEM
 
 ### Thunder Basin
 ###
+
+tb_fxn_diff_model_full <- lme(diff_anpp ~ as.factor(Year)*Drought*fxn_type+as.factor(Year)*Grazing*fxn_type+Grazing*Drought*fxn_type
+                              , data=filter(anpp_fxn_rr, Year %in% 2019:2023 & Site=="TB")
+                              , random = ~1 |Block/Paddock/Plot
+                              , correlation=corCompSymm(form = ~1 |Block/Paddock/Plot)
+                              , control=lmeControl(returnObject=TRUE)
+                              , na.action = na.omit)
+tb_fxn_diff_anova <- anova.lme(tb_fxn_diff_model_full, type="marginal")
+plot(tb_fxn_diff_model_full, type=c("p","smooth"), col.line=1)
+qqnorm(tb_fxn_diff_model_full, abline = c(0,1)) ## qqplot
+hist(filter(anpp_fxn_rr, Year %in% 2019:2023 & Site=="TB")$diff_anpp)
 
 ## c3p
 ##
@@ -1021,7 +1065,31 @@ dev.off()
 ### Calculate and plot compensation metric (annuals compensating for C3 reductions)
 ### 
 {
-anpp_fxn_grps <- anpp_fxn_grps %>%
+  
+  ## just do 99% drought and group the positives and negatives differences... then do ln(positive/negative) -- full compensation would be 
+  anpp_compensation_df <- anpp_fxn_rr %>%
+    mutate(direction_flag=ifelse(diff_anpp<0,"negative","positive")) %>%
+    group_by(Year, Site, Block, Paddock, Drought, Grazing, Plot, direction_flag) %>%
+    summarize(diff_anpp=sum(diff_anpp,na.rm=T)) %>%
+    ungroup() %>%
+    pivot_wider(names_from="direction_flag", values_from="diff_anpp") %>%
+    mutate(positive = replace_na(positive, 0.1),
+           negative = replace_na(negative, 0.1)) %>%
+    mutate(comp_factor = log(positive/abs(negative)))
+    
+  ggplot(anpp_compensation_df, aes(x=factor(Drought), y=comp_factor)) + geom_boxplot() + geom_jitter() + facet_grid(Site~Year)+ geom_hline(yintercept=0)
+  hist(anpp_compensation_df$comp_factor)
+  
+  anpp_compensation_means <- anpp_compensation_df %>%
+    group_by(Year, Site, Drought) %>%
+    summarize_at("comp_factor", .funs=list(mean=mean, se=SE_function))
+      
+  ggplot(filter(anpp_compensation_means, Site=="FK" & Drought==99 & Year %in% 2021:2023), aes(x=factor(Year), y=mean, ymin=mean-se, ymax=mean+se)) +
+    geom_errorbar(width=0, col="black") + geom_col(col="black",fill="white")
+  
+  ggsave(paste0(figure_dir,"compensation_99drought_fk.pdf"), width=5, height=5, units="in")
+
+  anpp_fxn_grps <- anpp_fxn_grps %>%
   mutate(Block_Paddock=paste(Block, Paddock, sep="_"))
 
 install.packages("groupedstats")

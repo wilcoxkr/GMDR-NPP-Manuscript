@@ -410,7 +410,7 @@ Anova(tb_2yr_ppt_grazing_lm, type=3)
   
   npp_ppt_grz_means$Grazing <- factor(npp_ppt_grz_means$Grazing, levels=c("MLLMM","MMMMM","HHMMM")) 
   
-  ggplot(filter(npp_ppt_grz_means,npp_type=="ANPP"), aes(x=rain_year_ppt_mean, y=npp_mean, ymin=npp_mean-npp_se, ymax=npp_mean+npp_se, fill=factor(Drought), shape=factor(Year))) +
+  ppt1yrGrzPlot <- ggplot(filter(npp_ppt_grz_means,npp_type=="ANPP"), aes(x=rain_year_ppt_mean, y=npp_mean, ymin=npp_mean-npp_se, ymax=npp_mean+npp_se, fill=factor(Drought), shape=factor(Year))) +
     geom_errorbar(width=15) +
     geom_point(size=3) +
     geom_smooth(inherit.aes=F, aes(x=rain_year_ppt_mean, y=npp_mean), method="lm", se=F, col="black") +
@@ -420,6 +420,10 @@ Anova(tb_2yr_ppt_grazing_lm, type=3)
     theme_few()
   
   ggsave(paste0(write_dir, "figures//1 year ppt vs npp - split by grazing_",Sys.Date(),".png"), width=6,height=6, units="in")
+  
+  pdf(paste0(write_dir, "figures//1 year ppt vs npp - split by grazing_",Sys.Date(),".pdf"), width=6, height=6, useDingbats = F)
+  print(ppt1yrGrzPlot)
+  dev.off()
   
   
   ## 2 year cumulative
@@ -431,8 +435,24 @@ Anova(tb_2yr_ppt_grazing_lm, type=3)
               ppt_prev1 = mean(ppt_prev1)) %>%
     ungroup()
   
-  npp_ppt_2yr_grz_means$Grazing <- factor(npp_ppt_2yr_grz_means$Grazing, levels=c("MLLMM","MMMMM","HHMMM")) 
-  ggplot(filter(npp_ppt_2yr_grz_means,npp_type=="ANPP"), aes(x=ppt_2Yr_mean, y=npp_mean, ymin=npp_mean-npp_se, ymax=npp_mean+npp_se, fill=factor(Drought), shape=factor(Year))) +
+    npp_ppt_2yr_grz_means$Grazing <- factor(npp_ppt_2yr_grz_means$Grazing, levels=c("MLLMM","MMMMM","HHMMM")) 
+  
+    # prev year ppt
+  pptPrevYrGrzPlot <- ggplot(filter(npp_ppt_2yr_grz_means,npp_type=="ANPP"), aes(x=ppt_prev1, y=npp_mean, ymin=npp_mean-npp_se, ymax=npp_mean+npp_se, fill=factor(Drought), shape=factor(Year))) +
+    geom_errorbar(width=15) +
+    geom_point(size=3) +
+    geom_smooth(inherit.aes=F, aes(x=ppt_prev1, y=npp_mean), method="lm", se=F, col="black") +
+    scale_fill_manual(values=droughtColor) +
+    scale_shape_manual(values=c(13,21:25)) +
+    facet_grid(Grazing~Site, scales="free_y") +
+    theme_few()
+  
+  pdf(paste0(write_dir, "figures//Prev 1yr ppt vs npp - split by grazing_",Sys.Date(),".pdf"), width=6, height=6, useDingbats = F)
+  print(pptPrevYrGrzPlot)
+  dev.off()
+  
+  # 2 year ppt
+  ppt2YrGrzPlot <- ggplot(filter(npp_ppt_2yr_grz_means,npp_type=="ANPP"), aes(x=ppt_2Yr_mean, y=npp_mean, ymin=npp_mean-npp_se, ymax=npp_mean+npp_se, fill=factor(Drought), shape=factor(Year))) +
     geom_errorbar(width=15) +
     geom_point(size=3) +
     geom_smooth(inherit.aes=F, aes(x=ppt_2Yr_mean, y=npp_mean), method="lm", se=F, col="black") +
@@ -443,6 +463,9 @@ Anova(tb_2yr_ppt_grazing_lm, type=3)
   
   ggsave(paste0(write_dir, "figures//2yr ppt vs npp - split by grazing_",Sys.Date(),".png"), width=6,height=6, units="in")
   
+  pdf(paste0(write_dir, "figures//2yr ppt vs npp - split by grazing_",Sys.Date(),".pdf"), width=6, height=6, useDingbats = F)
+  print(ppt2YrGrzPlot)
+  dev.off()
   
 
 }

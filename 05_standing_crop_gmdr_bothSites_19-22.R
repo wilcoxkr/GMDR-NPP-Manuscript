@@ -131,7 +131,7 @@ min(fk_stcrop_plot_means$som_biomass_gm2)
 
 stcrop_all <- fk_stcrop_plot_means %>%
   bind_rows(tb_stcrop_all)
-
+write.csv(stcrop_all, "GMDR_stcrop_both sites_2018-2023.csv", row.names=F)
 with(stcrop_all, table(site, year, block))
 
 ## Take a look
