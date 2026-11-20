@@ -261,6 +261,19 @@ for(TRT in 1:length(fk_trt_vec)){
 }
 
 ###
+### Group site-level precip data (not daymet) together for future analyses
+### 
+{
+  ppt_trt_both_sites <- bind_rows(
+    fk_trt_ppt, tb_trt_ppt
+  )
+  
+  write.csv(ppt_trt_both_sites, "C:\\Users\\k_wilcox\\OneDrive - UNCG\\Current projects\\GMDR\\data\\precipitation\\daily ppt cleaned both sites 2026-05-12.csv", row.names = F)
+  
+  
+  
+}
+###
 ### Plot long-term SPEI with control ppt and then treatment SPEI on top
 ###
 {

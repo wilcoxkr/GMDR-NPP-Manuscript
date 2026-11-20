@@ -54,16 +54,56 @@ source("C:\\Users\\wilco\\OneDrive - UNCG\\Git projects\\Grazing-Management-for-
     rename(Site=site, Plot=plot, Year=rain_year) %>%
     filter(Year %in% 2018:2023)
   
+  ppt_trt_both_sites <- read.csv("C:\\Users\\k_wilcox\\OneDrive - UNCG\\Current projects\\GMDR\\data\\precipitation\\daily ppt cleaned both sites 2026-05-12.csv") %>%
+    rename(Site=site, Year=year, rainfall_reduction=Drought) %>%
+    mutate(Rain_year=ifelse(month >= 8, Year+1, Year)) %>% ## Rain year is August 1 - July 31
+    mutate(three_mo_flag = ifelse(month %in% 5:7,1,0),
+           six_mo_flag = ifelse(month %in% 2:7,1,0),
+           nine_mo_flag = ifelse(month %in% c(11:12,1:7),1,0))
+  
+  ppt_3mo <- ppt_trt_both_sites %>%
+    filter(three_mo_flag==1) %>%
+    group_by(Site, Rain_year, rainfall_reduction) %>%
+    summarize(three_mo_ppt = sum(ppt_trt)) %>%
+    ungroup() %>%
+    rename(Year=Rain_year)
+    
+      
+  ppt_6mo <- ppt_trt_both_sites %>%
+    filter(six_mo_flag==1) %>%
+    group_by(Site, Rain_year, rainfall_reduction) %>%
+    summarize(six_mo_ppt = sum(ppt_trt)) %>%
+    ungroup() %>%
+    rename(Year=Rain_year)
+      
+  ppt_9mo <- ppt_trt_both_sites %>%
+    filter(nine_mo_flag==1) %>%
+    group_by(Site, Rain_year, rainfall_reduction) %>%
+    summarize(nine_mo_ppt = sum(ppt_trt)) %>%
+    ungroup() %>%
+    rename(Year=Rain_year)
+  
+  ppt_3_6_9_12_mo <- ppt_rainyear %>%
+    full_join(ppt_3mo, by=c("Site","Year","rainfall_reduction")) %>%
+    full_join(ppt_6mo, by=c("Site","Year","rainfall_reduction")) %>%
+    full_join(ppt_9mo, by=c("Site","Year","rainfall_reduction"))
+      
   npp_ppt_df <- npp_df %>% ### Note: there are some plots in 2018 that don't match up due to the accidental shifting of the fences -- these are creating extra rows when merging. We can remove these extra rows 
-    full_join(ppt_rainyear, by=c("Site","Plot", "Year")) %>%
+    full_join(ppt_3_6_9_12_mo, by=c("Site","Plot", "Year")) %>%
     mutate(trt_on = ifelse(Year%in%2019:2020, "yes","no"))
   
   npp_ppt_means <- npp_ppt_df %>%
     group_by(Year, Site, npp_type, Drought) %>%
     summarize(npp_mean = mean(npp_gm2, na.rm=T),
               npp_se = SE_function(npp_gm2),
-              rain_year_ppt_mean = mean(rain_year_ppt, na.rm=T))
-## take a quick look at plots
+              rain_year_ppt_mean = mean(rain_year_ppt, na.rm=T),
+              three_mo_ppt_mean = mean(three_mo_ppt,na.rm=T),
+              six_mo_ppt_mean = mean(six_mo_ppt,na.rm=T),
+              nine_mo_ppt_mean = mean(nine_mo_ppt,na.rm=T)
+              ) %>%
+    ungroup()
+
+  ## take a quick look at plots
   # ggplot(filter(npp_ppt_df,npp_type=="ANPP"), aes(x=rain_year_ppt, y=npp_gm2, col=trt_on)) +
   #   geom_point() +
   #   facet_wrap(~Site)
@@ -204,6 +244,45 @@ with(filter(npp_ppt_2yr_df, Site=="FK"&npp_type=="ANPP"), plot(ppt_prev1,ppt_2Yr
   current_ppt_trendlines_both <- tb_current_ppt_trendlines %>%
     bind_rows(fk_current_ppt_trendlines)
   
+  ### Cpomparing R2 for 3 month, 6 month, 9 month, and 12 month models
+  # FK
+  # 3mo
+  performance::r2(lm(npp_gm2~three_mo_ppt, data=filter(npp_ppt_df,npp_type=="ANPP"&Site=="FK")))
+  performance::r2(lm(log(npp_gm2)~three_mo_ppt, data=filter(npp_ppt_df,npp_type=="ANPP"&Site=="FK")))
+  performance::r2(lm(sqrt(npp_gm2)~three_mo_ppt, data=filter(npp_ppt_df,npp_type=="ANPP"&Site=="FK")))
+  # 6mo
+  performance::r2(lm(npp_gm2~six_mo_ppt, data=filter(npp_ppt_df,npp_type=="ANPP"&Site=="FK")))
+  performance::r2(lm(log(npp_gm2)~six_mo_ppt, data=filter(npp_ppt_df,npp_type=="ANPP"&Site=="FK")))
+  performance::r2(lm(sqrt(npp_gm2)~six_mo_ppt, data=filter(npp_ppt_df,npp_type=="ANPP"&Site=="FK")))
+  # 3mo
+  performance::r2(lm(npp_gm2~nine_mo_ppt, data=filter(npp_ppt_df,npp_type=="ANPP"&Site=="FK")))
+  performance::r2(lm(log(npp_gm2)~nine_mo_ppt, data=filter(npp_ppt_df,npp_type=="ANPP"&Site=="FK")))
+  performance::r2(lm(sqrt(npp_gm2)~nine_mo_ppt, data=filter(npp_ppt_df,npp_type=="ANPP"&Site=="FK")))
+  # 12mo
+  performance::r2(lm(npp_gm2~rain_year_ppt, data=filter(npp_ppt_df,npp_type=="ANPP"&Site=="FK")))
+  performance::r2(lm(log(npp_gm2)~rain_year_ppt, data=filter(npp_ppt_df,npp_type=="ANPP"&Site=="FK")))
+  performance::r2(lm(sqrt(npp_gm2)~rain_year_ppt, data=filter(npp_ppt_df,npp_type=="ANPP"&Site=="FK")))
+  
+  # TB
+  # 3mo
+  performance::r2(lm(npp_gm2~three_mo_ppt, data=filter(npp_ppt_df,npp_type=="ANPP"&Site=="TB")))
+  performance::r2(lm(log(npp_gm2)~three_mo_ppt, data=filter(npp_ppt_df,npp_type=="ANPP"&Site=="TB")))
+  performance::r2(lm(sqrt(npp_gm2)~three_mo_ppt, data=filter(npp_ppt_df,npp_type=="ANPP"&Site=="TB")))
+  # 6mo
+  performance::r2(lm(npp_gm2~six_mo_ppt, data=filter(npp_ppt_df,npp_type=="ANPP"&Site=="TB")))
+  performance::r2(lm(log(npp_gm2)~six_mo_ppt, data=filter(npp_ppt_df,npp_type=="ANPP"&Site=="TB")))
+  performance::r2(lm(sqrt(npp_gm2)~six_mo_ppt, data=filter(npp_ppt_df,npp_type=="ANPP"&Site=="TB")))
+  # 3mo
+  performance::r2(lm(npp_gm2~nine_mo_ppt, data=filter(npp_ppt_df,npp_type=="ANPP"&Site=="TB")))
+  performance::r2(lm(log(npp_gm2)~nine_mo_ppt, data=filter(npp_ppt_df,npp_type=="ANPP"&Site=="TB")))
+  performance::r2(lm(sqrt(npp_gm2)~nine_mo_ppt, data=filter(npp_ppt_df,npp_type=="ANPP"&Site=="TB")))
+  # 12mo
+  performance::r2(lm(npp_gm2~rain_year_ppt, data=filter(npp_ppt_df,npp_type=="ANPP"&Site=="TB")))
+  performance::r2(lm(log(npp_gm2)~rain_year_ppt, data=filter(npp_ppt_df,npp_type=="ANPP"&Site=="TB")))
+  performance::r2(lm(sqrt(npp_gm2)~rain_year_ppt, data=filter(npp_ppt_df,npp_type=="ANPP"&Site=="TB")))
+  
+  
+  
   ### 2 year precip models
   ## Testing transformations - LOG MODELS HAVE HIGHEST R2
   performance::r2(lm(npp_gm2~ppt_2Yr*Site, data=filter(npp_ppt_2yr_df,npp_type=="ANPP")))
@@ -213,6 +292,10 @@ with(filter(npp_ppt_2yr_df, Site=="FK"&npp_type=="ANPP"), plot(ppt_prev1,ppt_2Yr
   performance::r2(lm(npp_gm2~ppt_2Yr, data=filter(npp_ppt_2yr_df,npp_type=="ANPP"&Site=="FK")))
   performance::r2(lm(log(npp_gm2)~ppt_2Yr, data=filter(npp_ppt_2yr_df,npp_type=="ANPP"&Site=="FK")))
   performance::r2(lm(sqrt(npp_gm2)~ppt_2Yr, data=filter(npp_ppt_2yr_df,npp_type=="ANPP"&Site=="FK")))
+  
+  performance::r2(lm(npp_gm2~ppt_2Yr, data=filter(npp_ppt_2yr_df,npp_type=="ANPP"&Site=="TB")))
+  performance::r2(lm(log(npp_gm2)~ppt_2Yr, data=filter(npp_ppt_2yr_df,npp_type=="ANPP"&Site=="TB")))
+  performance::r2(lm(sqrt(npp_gm2)~ppt_2Yr, data=filter(npp_ppt_2yr_df,npp_type=="ANPP"&Site=="TB")))
   
   ppt_2yr_anpp_lm <- lm(log(npp_gm2)~ppt_2Yr*Site, data=filter(npp_ppt_2yr_df,npp_type=="ANPP"))
   Anova(ppt_2yr_anpp_lm, type=3)
@@ -328,7 +411,7 @@ with(filter(npp_ppt_2yr_df, Site=="FK"&npp_type=="ANPP"), plot(ppt_prev1,ppt_2Yr
 
 
 ###
-### Plotting 1 year, prev year, and 2 year cumulative vs ANPP and BNPP by site
+### Plotting 1 year, prev year, and 2 year cumulative vs ANPP and BNPP by site -- and 3 mo, 6 mo, 9 mo
 ###
 {
   # current year
@@ -373,6 +456,39 @@ with(filter(npp_ppt_2yr_df, Site=="FK"&npp_type=="ANPP"), plot(ppt_prev1,ppt_2Yr
   pdf(paste0(write_dir, "figures//ppt-anpp regression last 2 rainYears",Sys.Date(),".pdf"), width=7, height=3, useDingbats = F)
   print(ppt2yrPlot)
   dev.off()
+  
+  # 3 month
+  ppt3moPlot <- ggplot(filter(npp_ppt_means,npp_type=="ANPP"), aes(x=three_mo_ppt_mean, y=npp_mean, ymin=npp_mean-npp_se, ymax=npp_mean+npp_se, fill=factor(Drought), shape=factor(Year))) +
+    geom_errorbar(width=15, col="black") +
+    geom_point(col="black", size=3) +
+#    geom_line(inherit.aes=F, data=current_ppt_trendlines_both, aes(x=xhat, y=yhat^2), col="black") +
+    geom_smooth(method="lm",se=F) +
+    scale_fill_manual(values=droughtColor) +
+    scale_shape_manual(values=c(13,21,24,22,23,25)) +
+    facet_wrap(~Site, scales="free_y") +
+    theme_few()
+
+    # 6 month
+  ppt6moPlot <- ggplot(filter(npp_ppt_means,npp_type=="ANPP"), aes(x=six_mo_ppt_mean, y=npp_mean, ymin=npp_mean-npp_se, ymax=npp_mean+npp_se, fill=factor(Drought), shape=factor(Year))) +
+    geom_errorbar(width=15, col="black") +
+    geom_point(col="black", size=3) +
+#    geom_line(inherit.aes=F, data=current_ppt_trendlines_both, aes(x=xhat, y=yhat^2), col="black") +
+    geom_smooth(method="lm",se=F) +
+    scale_fill_manual(values=droughtColor) +
+    scale_shape_manual(values=c(13,21,24,22,23,25)) +
+    facet_wrap(~Site, scales="free_y") +
+    theme_few()
+
+    # 9 month
+  ppt9moPlot <- ggplot(filter(npp_ppt_means,npp_type=="ANPP"), aes(x=nine_mo_ppt_mean, y=npp_mean, ymin=npp_mean-npp_se, ymax=npp_mean+npp_se, fill=factor(Drought), shape=factor(Year))) +
+    geom_errorbar(width=15, col="black") +
+    geom_point(col="black", size=3) +
+#    geom_line(inherit.aes=F, data=current_ppt_trendlines_both, aes(x=xhat, y=yhat^2), col="black") +
+    geom_smooth(method="lm",se=F) +
+    scale_fill_manual(values=droughtColor) +
+    scale_shape_manual(values=c(13,21,24,22,23,25)) +
+    facet_wrap(~Site, scales="free_y") +
+    theme_few()
   
 }
 
